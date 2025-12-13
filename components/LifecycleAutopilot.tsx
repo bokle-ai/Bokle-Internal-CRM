@@ -4,7 +4,7 @@ import { Deal, DealStatus } from '../types';
 import { generateStageArtifact, generateSalesScript, generateHandover } from '../services/geminiService';
 import { 
     CheckCircle2, Circle, ArrowRight, FileText, Code2, 
-    MessageSquare, Loader2, PlayCircle, ChevronRight, Download 
+    MessageSquare, Loader2, PlayCircle, ChevronRight, Download, AlertTriangle 
 } from 'lucide-react';
 
 interface LifecycleAutopilotProps {
@@ -52,8 +52,9 @@ const LifecycleAutopilot: React.FC<LifecycleAutopilotProps> = ({ deal, onClose, 
                 result = await generateStageArtifact(currentStage.id, currentStage.artifact, deal.clientName, context);
             }
             setGeneratedContent(result);
-        } catch (e) {
-            setGeneratedContent('Error generating content. Please try again.');
+        } catch (e: any) {
+            // Should usually be caught by service, but just in case
+            setGeneratedContent(`### ⚠️ Error\n\nFailed to generate content: ${e.message}`);
         } finally {
             setLoading(false);
         }
@@ -84,6 +85,8 @@ const LifecycleAutopilot: React.FC<LifecycleAutopilotProps> = ({ deal, onClose, 
             setGeneratedContent(''); // Clear content for next stage
         }
     };
+
+    const isErrorContent = generatedContent.includes("### ⚠️");
 
     return (
         <div className="flex flex-col h-full bg-gray-50 -m-4 lg:-m-8">
@@ -195,7 +198,7 @@ const LifecycleAutopilot: React.FC<LifecycleAutopilotProps> = ({ deal, onClose, 
                                     {generatedContent ? 'Regenerate' : 'Run AI Generator'}
                                 </button>
                                 
-                                {generatedContent && (
+                                {generatedContent && !isErrorContent && (
                                     <>
                                         <button 
                                             onClick={handleDownload}
@@ -219,7 +222,7 @@ const LifecycleAutopilot: React.FC<LifecycleAutopilotProps> = ({ deal, onClose, 
                         </div>
 
                         {/* Result Display */}
-                        <div className="flex-1 bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden relative flex flex-col">
+                        <div className={`flex-1 bg-white rounded-xl shadow-sm border overflow-hidden relative flex flex-col ${isErrorContent ? 'border-red-200' : 'border-gray-200'}`}>
                             {!generatedContent && !loading && (
                                 <div className="flex-1 flex flex-col items-center justify-center text-gray-400 p-10 text-center">
                                     <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
