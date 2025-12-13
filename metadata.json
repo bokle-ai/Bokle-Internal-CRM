@@ -1,0 +1,5 @@
+{
+  "name": "Bokle AI Strategy Assistant",
+  "description": "Internal tool for Bokle AI founder to manage sales calls, explain services simply, generate proposals, and handover tasks to the tech team.",
+  "requestFramePermissions": []
+}
