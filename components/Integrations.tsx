@@ -163,44 +163,44 @@ create policy "Enable all access" on public.deal_artifacts for all using (true) 
         <div className="space-y-6">
             <div>
                 <h2 className="text-2xl font-bold text-[#373737]">Integrations & Settings</h2>
-                <p className="text-gray-500">Connect your accounts and manage your database.</p>
+                <p className="text-gray-600 font-medium">Connect your accounts and manage your database.</p>
             </div>
 
             {/* Supabase Section */}
             <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
                 <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 bg-green-50 text-green-600 rounded-lg flex items-center justify-center shrink-0">
+                    <div className="w-12 h-12 bg-green-50 text-green-700 rounded-lg flex items-center justify-center shrink-0">
                         <Cloud size={24} />
                     </div>
                     <div className="flex-1">
                         <h3 className="text-lg font-bold text-gray-900">Supabase Cloud Database</h3>
-                        <p className="text-gray-500 text-sm mb-4">
+                        <p className="text-gray-700 text-sm mb-4 font-medium">
                             Connect a free Supabase project to sync your CRM data across devices.
                         </p>
 
                         {!isSbConfigured ? (
                             <div className="space-y-3 max-w-lg">
                                 <input 
-                                    className="w-full p-2 border border-gray-300 rounded text-sm" 
+                                    className="w-full p-2.5 border border-gray-300 rounded text-sm text-gray-900 placeholder:text-gray-500 focus:border-green-600 outline-none" 
                                     placeholder="Project URL (https://xyz.supabase.co)"
                                     value={sbUrl} onChange={e => setSbUrl(e.target.value)}
                                 />
                                 <input 
                                     type="password"
-                                    className="w-full p-2 border border-gray-300 rounded text-sm" 
+                                    className="w-full p-2.5 border border-gray-300 rounded text-sm text-gray-900 placeholder:text-gray-500 focus:border-green-600 outline-none" 
                                     placeholder="Anon Public Key"
                                     value={sbKey} onChange={e => setSbKey(e.target.value)}
                                 />
                                 <div className="flex gap-2">
                                     <button 
                                         onClick={handleSaveSupabase}
-                                        className="bg-green-600 text-white px-4 py-2 rounded text-sm font-bold hover:bg-green-700"
+                                        className="bg-green-700 text-white px-4 py-2 rounded text-sm font-bold hover:bg-green-800"
                                     >
                                         Connect
                                     </button>
                                     <button 
                                         onClick={() => setShowSql(!showSql)}
-                                        className="text-gray-600 px-4 py-2 rounded text-sm hover:bg-gray-100 underline"
+                                        className="text-gray-700 px-4 py-2 rounded text-sm hover:bg-gray-100 underline font-medium"
                                     >
                                         {showSql ? 'Hide SQL' : 'View SQL Setup Code'}
                                     </button>
@@ -208,10 +208,10 @@ create policy "Enable all access" on public.deal_artifacts for all using (true) 
                             </div>
                         ) : (
                             <div className="flex items-center gap-4 bg-green-50 p-4 rounded-md border border-green-200">
-                                <CheckCircle2 className="text-green-600" />
+                                <CheckCircle2 className="text-green-700" />
                                 <div className="flex-1">
-                                    <h4 className="font-bold text-green-800">Connected to Supabase</h4>
-                                    <p className="text-xs text-green-700">Data is being synced to the cloud.</p>
+                                    <h4 className="font-bold text-green-900">Connected to Supabase</h4>
+                                    <p className="text-xs text-green-800 font-medium">Data is being synced to the cloud.</p>
                                 </div>
                                 <button onClick={handleRemoveSupabase} className="text-red-600 hover:text-red-800 p-2"><Trash2 size={18} /></button>
                             </div>
@@ -221,11 +221,11 @@ create policy "Enable all access" on public.deal_artifacts for all using (true) 
                             <div className="mt-4 bg-gray-900 p-4 rounded-md overflow-x-auto relative">
                                 <button 
                                     onClick={() => navigator.clipboard.writeText(setupSQL)}
-                                    className="absolute top-2 right-2 text-xs bg-white/10 text-white px-2 py-1 rounded hover:bg-white/20"
+                                    className="absolute top-2 right-2 text-xs bg-white/10 text-white px-2 py-1 rounded hover:bg-white/20 font-bold"
                                 >
                                     Copy
                                 </button>
-                                <pre className="text-xs text-green-400 font-mono">{setupSQL}</pre>
+                                <pre className="text-xs text-green-400 font-mono font-medium">{setupSQL}</pre>
                             </div>
                         )}
                     </div>
@@ -235,18 +235,18 @@ create policy "Enable all access" on public.deal_artifacts for all using (true) 
             {/* API Key Management Section */}
             <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
                 <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 bg-purple-50 text-purple-600 rounded-lg flex items-center justify-center shrink-0">
+                    <div className="w-12 h-12 bg-purple-50 text-purple-700 rounded-lg flex items-center justify-center shrink-0">
                         <Key size={24} />
                     </div>
                     <div className="flex-1">
                         <h3 className="text-lg font-bold text-gray-900">Gemini API Key</h3>
-                        <p className="text-gray-500 text-sm mb-4">
+                        <p className="text-gray-700 text-sm mb-4 font-medium">
                             Required for AI features.
                         </p>
 
                         <div className="flex flex-col gap-3">
                             {isEnvKeyPresent && (
-                                <div className="flex items-center gap-2 text-sm text-green-700 bg-green-50 px-3 py-2 rounded-md border border-green-200 w-fit">
+                                <div className="flex items-center gap-2 text-sm text-green-800 font-bold bg-green-50 px-3 py-2 rounded-md border border-green-200 w-fit">
                                     <CheckCircle2 size={16} />
                                     <span>Active via Environment Variable</span>
                                 </div>
@@ -255,26 +255,26 @@ create policy "Enable all access" on public.deal_artifacts for all using (true) 
                             {storedKey ? (
                                 <div className="flex items-center gap-4 bg-gray-50 p-3 rounded-md border border-gray-200">
                                     <div className="flex-1">
-                                        <div className="text-xs text-gray-500 uppercase font-semibold">Stored in Browser</div>
-                                        <div className="font-mono text-sm text-gray-800">
+                                        <div className="text-xs text-gray-600 uppercase font-bold">Stored in Browser</div>
+                                        <div className="font-mono text-sm text-gray-900 font-medium">
                                             {storedKey.substring(0, 8)}...{storedKey.substring(storedKey.length - 4)}
                                         </div>
                                     </div>
-                                    <button onClick={handleRemoveKey} className="text-red-500 hover:text-red-700 p-2"><Trash2 size={18} /></button>
+                                    <button onClick={handleRemoveKey} className="text-red-600 hover:text-red-800 p-2"><Trash2 size={18} /></button>
                                 </div>
                             ) : !isEnvKeyPresent && (
                                 <div className="flex gap-2">
                                     <input 
                                         type="password"
                                         placeholder="Paste API Key (AIza...)"
-                                        className="flex-1 p-2 border border-gray-300 rounded-md outline-none text-sm"
+                                        className="flex-1 p-2.5 border border-gray-300 rounded-md outline-none text-sm text-gray-900"
                                         value={newKey}
                                         onChange={(e) => setNewKey(e.target.value)}
                                     />
                                     <button 
                                         onClick={handleSaveKey}
                                         disabled={!newKey}
-                                        className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2 rounded-md text-sm font-bold"
+                                        className="bg-purple-700 hover:bg-purple-800 text-white px-4 py-2 rounded-md text-sm font-bold"
                                     >
                                         Save
                                     </button>
@@ -288,20 +288,20 @@ create policy "Enable all access" on public.deal_artifacts for all using (true) 
             {/* Local Backup Section */}
             <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
                 <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 bg-orange-50 text-orange-600 rounded-lg flex items-center justify-center shrink-0">
+                    <div className="w-12 h-12 bg-orange-50 text-orange-700 rounded-lg flex items-center justify-center shrink-0">
                         <Database size={24} />
                     </div>
                     <div className="flex-1">
                         <h3 className="text-lg font-bold text-gray-900">Local Data & Backup</h3>
-                        <p className="text-gray-500 text-sm mb-4">
+                        <p className="text-gray-700 text-sm mb-4 font-medium">
                             Manage the data stored in your browser (if not using Supabase).
                         </p>
                         
                         <div className="flex gap-3">
-                            <button onClick={handleDownloadBackup} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-md hover:bg-gray-50 text-sm font-medium text-gray-700">
+                            <button onClick={handleDownloadBackup} className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-300 rounded-md hover:bg-gray-50 text-sm font-bold text-gray-800">
                                 <Download size={16} /> Download Backup
                             </button>
-                            <button onClick={handleResetData} className="flex items-center gap-2 px-4 py-2 bg-white border border-red-200 text-red-600 rounded-md hover:bg-red-50 text-sm font-medium">
+                            <button onClick={handleResetData} className="flex items-center gap-2 px-4 py-2 bg-white border border-red-200 text-red-700 rounded-md hover:bg-red-50 text-sm font-bold">
                                 <RefreshCw size={16} /> Reset
                             </button>
                         </div>

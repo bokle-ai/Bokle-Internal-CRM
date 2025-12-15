@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { LayoutDashboard, PhoneCall, Handshake, FileText, Code2, Menu, X, Users, Settings } from 'lucide-react';
+import { LayoutDashboard, PhoneCall, Handshake, FileText, Code2, Menu, X, Users, Settings, Database } from 'lucide-react';
 
 interface LayoutProps {
     children: React.ReactNode;
@@ -18,6 +18,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
         { id: 'explainer', label: 'Service Explainer', icon: Handshake },
         { id: 'handover', label: 'Tech Handover', icon: Code2 },
         { id: 'documents', label: 'Doc Generator', icon: FileText },
+        { id: 'storage', label: 'Data Storage', icon: Database },
         { id: 'integrations', label: 'Integrations', icon: Settings },
     ];
 
@@ -102,7 +103,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
 
                 <div className="absolute bottom-0 w-full p-6 bg-[#0e4412]">
                     <p className="text-xs text-white/60">Bokle AI Internal Tool</p>
-                    <p className="text-xs text-white/40 mt-1">v1.0.0 • Founder Edition</p>
+                    <p className="text-xs text-white/40 mt-1">v1.1.0 • Founder Edition</p>
                 </div>
             </aside>
 

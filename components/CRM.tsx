@@ -1,6 +1,6 @@
 
-import React, { useState, useEffect } from 'react';
-import { Plus, DollarSign, Calendar, Zap, Trash2, Megaphone, Instagram, Linkedin, Video, Image, FileText, Code, Briefcase, Loader2, Cloud, CloudOff } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Plus, DollarSign, Calendar, Zap, Trash2, Megaphone, Instagram, Linkedin, Video, Image, FileText, Code, Briefcase, Loader2, Cloud, CloudOff, Save, CheckCircle2, RotateCcw } from 'lucide-react';
 import { Deal, DealStatus, Project, ProjectStatus, MarketingTask, MarketingStatus } from '../types';
 import LifecycleAutopilot from './LifecycleAutopilot';
 import { DataService } from '../services/storageService';
@@ -10,11 +10,27 @@ const CRM: React.FC = () => {
     const [isLoading, setIsLoading] = useState(true);
     const [isCloud, setIsCloud] = useState(false);
     
-    // State
+    // Data State
     const [deals, setDeals] = useState<Deal[]>([]);
     const [projects, setProjects] = useState<Project[]>([]);
     const [marketingTasks, setMarketingTasks] = useState<MarketingTask[]>([]);
     
+    // Autosave & Dirty Tracking Refs
+    const dealsRef = useRef<Deal[]>([]);
+    const projectsRef = useRef<Project[]>([]);
+    const tasksRef = useRef<MarketingTask[]>([]);
+    
+    const dirtyDeals = useRef<Set<string>>(new Set());
+    const dirtyProjects = useRef<Set<string>>(new Set());
+    const dirtyTasks = useRef<Set<string>>(new Set());
+
+    const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
+
+    // Keep Refs synced with State
+    useEffect(() => { dealsRef.current = deals; }, [deals]);
+    useEffect(() => { projectsRef.current = projects; }, [projects]);
+    useEffect(() => { tasksRef.current = marketingTasks; }, [marketingTasks]);
+
     // Load Data Effect
     useEffect(() => {
         const fetchData = async () => {
@@ -35,19 +51,70 @@ const CRM: React.FC = () => {
         fetchData();
     }, []);
 
-    // Autopilot State
-    const [autopilotDeal, setAutopilotDeal] = useState<Deal | null>(null);
+    // --- AUTOSAVE ENGINE ---
+    const flushChanges = async () => {
+        if (dirtyDeals.current.size === 0 && dirtyProjects.current.size === 0 && dirtyTasks.current.size === 0) {
+            return;
+        }
 
-    // Form States
+        setSaveStatus('saving');
+
+        const dealsToSave = dealsRef.current.filter(d => dirtyDeals.current.has(d.id));
+        for (const d of dealsToSave) await DataService.saveDeal(d);
+        dirtyDeals.current.clear();
+
+        const projectsToSave = projectsRef.current.filter(p => dirtyProjects.current.has(p.id));
+        for (const p of projectsToSave) await DataService.saveProject(p);
+        dirtyProjects.current.clear();
+
+        const tasksToSave = tasksRef.current.filter(t => dirtyTasks.current.has(t.id));
+        for (const t of tasksToSave) await DataService.saveMarketing(t);
+        dirtyTasks.current.clear();
+
+        setTimeout(() => setSaveStatus('saved'), 500);
+    };
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            flushChanges();
+        }, 30000); 
+
+        return () => {
+            clearInterval(interval);
+            flushChanges();
+        };
+    }, []);
+
+    // --- FORM DRAFT AUTOSAVE ---
+    const [input1, setInput1] = useState(''); 
+    const [input2, setInput2] = useState(''); 
+    const [input3, setInput3] = useState(''); 
+    const [input4, setInput4] = useState(''); 
+
+    useEffect(() => {
+        const draft = localStorage.getItem('crm_draft_inputs');
+        if (draft) {
+            const parsed = JSON.parse(draft);
+            if (parsed.view === view) {
+                setInput1(parsed.input1 || '');
+                setInput2(parsed.input2 || '');
+                setInput3(parsed.input3 || '');
+                setInput4(parsed.input4 || '');
+            }
+        }
+    }, [view]);
+
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            localStorage.setItem('crm_draft_inputs', JSON.stringify({ view, input1, input2, input3, input4 }));
+        }, 1000);
+        return () => clearTimeout(timer);
+    }, [input1, input2, input3, input4, view]);
+
+
+    const [autopilotDeal, setAutopilotDeal] = useState<Deal | null>(null);
     const [isAdding, setIsAdding] = useState(false);
     
-    // Shared inputs
-    const [input1, setInput1] = useState(''); // ClientName or Title
-    const [input2, setInput2] = useState(''); // Value or Deadline or DueDate
-    const [input3, setInput3] = useState(''); // Service or Feature or ContentType
-    const [input4, setInput4] = useState(''); // Platform (Marketing only)
-
-    // Sales Columns
     const salesColumns: DealStatus[] = ['Lead', 'Discovery', 'Proposal', 'Negotiation', 'Closed Won'];
     const techColumns: ProjectStatus[] = ['Backlog', 'In Progress', 'Review', 'Deployed'];
     const marketingColumns: MarketingStatus[] = ['Idea', 'Scripting', 'Design', 'Review', 'Scheduled', 'Published'];
@@ -67,8 +134,8 @@ const CRM: React.FC = () => {
                 notes: '',
                 problemStatement: ''
             };
-            setDeals(prev => [...prev, newDeal]); // Optimistic Update
-            await DataService.saveDeal(newDeal);
+            setDeals(prev => [...prev, newDeal]); 
+            await DataService.saveDeal(newDeal); 
         } else if (view === 'tech') {
             const newProject: Project = {
                 id,
@@ -92,6 +159,7 @@ const CRM: React.FC = () => {
             await DataService.saveMarketing(newTask);
         }
         
+        localStorage.removeItem('crm_draft_inputs');
         resetForm();
     };
 
@@ -103,44 +171,38 @@ const CRM: React.FC = () => {
         setInput4('');
     };
 
-    const updateDealStatus = async (id: string, newStatus: DealStatus) => {
-        const deal = deals.find(d => d.id === id);
-        if (deal) {
-            const updated = { ...deal, status: newStatus };
-            setDeals(prev => prev.map(d => d.id === id ? updated : d));
-            await DataService.saveDeal(updated);
-        }
+    const updateDealStatus = (id: string, newStatus: DealStatus) => {
+        setDeals(prev => prev.map(d => d.id === id ? { ...d, status: newStatus } : d));
+        dirtyDeals.current.add(id);
+        setSaveStatus('unsaved');
     };
 
-    const updateProjectStatus = async (id: string, newStatus: ProjectStatus) => {
-        const project = projects.find(p => p.id === id);
-        if (project) {
-            const updated = { ...project, status: newStatus };
-            setProjects(prev => prev.map(p => p.id === id ? updated : p));
-            await DataService.saveProject(updated);
-        }
+    const updateProjectStatus = (id: string, newStatus: ProjectStatus) => {
+        setProjects(prev => prev.map(p => p.id === id ? { ...p, status: newStatus } : p));
+        dirtyProjects.current.add(id);
+        setSaveStatus('unsaved');
     };
 
-    const updateMarketingStatus = async (id: string, newStatus: MarketingStatus) => {
-        const task = marketingTasks.find(t => t.id === id);
-        if (task) {
-            const updated = { ...task, status: newStatus };
-            setMarketingTasks(prev => prev.map(t => t.id === id ? updated : t));
-            await DataService.saveMarketing(updated);
-        }
+    const updateMarketingStatus = (id: string, newStatus: MarketingStatus) => {
+        setMarketingTasks(prev => prev.map(t => t.id === id ? { ...t, status: newStatus } : t));
+        dirtyTasks.current.add(id);
+        setSaveStatus('unsaved');
     };
 
     const deleteItem = async (id: string) => {
         if (view === 'sales') {
             setDeals(prev => prev.filter(d => d.id !== id));
+            dirtyDeals.current.delete(id);
             await DataService.deleteDeal(id);
         }
         if (view === 'tech') {
             setProjects(prev => prev.filter(p => p.id !== id));
+            dirtyProjects.current.delete(id);
             await DataService.deleteProject(id);
         }
         if (view === 'marketing') {
             setMarketingTasks(prev => prev.filter(t => t.id !== id));
+            dirtyTasks.current.delete(id);
             await DataService.deleteMarketing(id);
         }
     };
@@ -176,36 +238,50 @@ const CRM: React.FC = () => {
                     <h2 className="text-2xl font-bold text-[#373737] flex items-center gap-3">
                         Bokle CRM
                         {isCloud ? (
-                            <span className="text-xs font-normal bg-green-100 text-green-800 px-2 py-1 rounded-full flex items-center gap-1">
-                                <Cloud size={12} /> Supabase Sync Active
+                            <span className="text-xs font-normal bg-green-100 text-green-800 px-2 py-1 rounded-full flex items-center gap-1 border border-green-200">
+                                <Cloud size={12} /> Supabase Sync
                             </span>
                         ) : (
-                            <span className="text-xs font-normal bg-gray-100 text-gray-500 px-2 py-1 rounded-full flex items-center gap-1" title="Data stored in browser only">
-                                <CloudOff size={12} /> Local Mode
+                            <span className="text-xs font-normal bg-gray-100 text-gray-700 px-2 py-1 rounded-full flex items-center gap-1 border border-gray-200" title="Data stored in browser only">
+                                <CloudOff size={12} /> Local
+                            </span>
+                        )}
+                        {saveStatus === 'saving' && (
+                            <span className="text-xs font-normal bg-gray-50 text-gray-600 px-2 py-1 rounded-full flex items-center gap-1 animate-pulse border border-gray-200">
+                                <Save size={12} /> Saving...
+                            </span>
+                        )}
+                        {saveStatus === 'unsaved' && (
+                            <span className="text-xs font-normal bg-yellow-50 text-yellow-700 px-2 py-1 rounded-full flex items-center gap-1 border border-yellow-200">
+                                <RotateCcw size={12} /> Unsaved Changes
+                            </span>
+                        )}
+                        {saveStatus === 'saved' && (
+                            <span className="text-xs font-normal bg-white text-green-700 border border-green-200 px-2 py-1 rounded-full flex items-center gap-1">
+                                <CheckCircle2 size={12} /> Saved
                             </span>
                         )}
                     </h2>
-                    <p className="text-gray-500">One place for Sales, Development, and Marketing.</p>
+                    <p className="text-gray-600 font-medium">One place for Sales, Development, and Marketing.</p>
                 </div>
                 
                 <div className="flex bg-gray-200 p-1 rounded-lg self-start overflow-x-auto">
-                    <button onClick={() => setView('sales')} className={`px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-all whitespace-nowrap ${view === 'sales' ? 'bg-white text-[#15621B] shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>
+                    <button onClick={() => setView('sales')} className={`px-4 py-2 rounded-md text-sm font-bold flex items-center gap-2 transition-all whitespace-nowrap ${view === 'sales' ? 'bg-white text-[#15621B] shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>
                         <Briefcase size={16} /> Sales
                     </button>
-                    <button onClick={() => setView('marketing')} className={`px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-all whitespace-nowrap ${view === 'marketing' ? 'bg-white text-pink-700 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>
+                    <button onClick={() => setView('marketing')} className={`px-4 py-2 rounded-md text-sm font-bold flex items-center gap-2 transition-all whitespace-nowrap ${view === 'marketing' ? 'bg-white text-pink-700 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>
                         <Megaphone size={16} /> Content
                     </button>
-                    <button onClick={() => setView('tech')} className={`px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-all whitespace-nowrap ${view === 'tech' ? 'bg-white text-[#373737] shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>
+                    <button onClick={() => setView('tech')} className={`px-4 py-2 rounded-md text-sm font-bold flex items-center gap-2 transition-all whitespace-nowrap ${view === 'tech' ? 'bg-white text-[#373737] shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>
                         <Code size={16} /> Tech
                     </button>
                 </div>
             </div>
 
-            {/* Add New Button Area */}
             {!isAdding ? (
                 <button 
                     onClick={() => setIsAdding(true)}
-                    className={`flex items-center gap-2 font-medium hover:bg-opacity-10 p-2 rounded-lg w-fit transition-colors ${
+                    className={`flex items-center gap-2 font-bold hover:bg-opacity-10 p-2.5 rounded-lg w-fit transition-colors border border-transparent hover:border-current ${
                         view === 'marketing' ? 'text-pink-700 hover:bg-pink-100' : 
                         view === 'tech' ? 'text-[#373737] hover:bg-gray-200' :
                         'text-[#15621B] hover:bg-green-50'
@@ -217,28 +293,28 @@ const CRM: React.FC = () => {
             ) : (
                 <form 
                     onSubmit={handleAdd}
-                    className="bg-white p-4 rounded-xl border shadow-sm flex flex-col md:flex-row gap-4 items-end animate-in fade-in slide-in-from-top-2"
+                    className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row gap-4 items-end animate-in fade-in slide-in-from-top-2"
                 >
                     <div className="flex-1 w-full">
-                        <label className="text-xs font-semibold text-gray-500 uppercase">
+                        <label className="text-xs font-bold text-gray-700 uppercase">
                             {view === 'sales' ? 'Client Name' : view === 'marketing' ? 'Content Topic' : 'Client Name'}
                         </label>
-                        <input className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-[#15621B] outline-none text-black" value={input1} onChange={e => setInput1(e.target.value)} required placeholder={view === 'marketing' ? "e.g. 5 AI Hacks" : "e.g. Acme Corp"} />
+                        <input className="w-full p-2.5 border border-gray-300 rounded focus:ring-2 focus:ring-[#15621B] outline-none text-gray-900 font-medium placeholder:text-gray-400" value={input1} onChange={e => setInput1(e.target.value)} required placeholder={view === 'marketing' ? "e.g. 5 AI Hacks" : "e.g. Acme Corp"} />
                     </div>
                     
                     {view === 'marketing' ? (
                         <>
                             <div className="w-32">
-                                <label className="text-xs font-semibold text-gray-500 uppercase">Type</label>
-                                <select className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-[#15621B] outline-none bg-white text-black" value={input3} onChange={e => setInput3(e.target.value)}>
+                                <label className="text-xs font-bold text-gray-700 uppercase">Type</label>
+                                <select className="w-full p-2.5 border border-gray-300 rounded focus:ring-2 focus:ring-[#15621B] outline-none bg-white text-gray-900 font-medium" value={input3} onChange={e => setInput3(e.target.value)}>
                                     <option value="Post">Post</option>
                                     <option value="Reel">Reel</option>
                                     <option value="Carousel">Carousel</option>
                                 </select>
                             </div>
                             <div className="w-32">
-                                <label className="text-xs font-semibold text-gray-500 uppercase">Platform</label>
-                                <select className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-[#15621B] outline-none bg-white text-black" value={input4} onChange={e => setInput4(e.target.value)}>
+                                <label className="text-xs font-bold text-gray-700 uppercase">Platform</label>
+                                <select className="w-full p-2.5 border border-gray-300 rounded focus:ring-2 focus:ring-[#15621B] outline-none bg-white text-gray-900 font-medium" value={input4} onChange={e => setInput4(e.target.value)}>
                                     <option value="LinkedIn">LinkedIn</option>
                                     <option value="Instagram">Instagram</option>
                                 </select>
@@ -246,89 +322,88 @@ const CRM: React.FC = () => {
                         </>
                     ) : (
                         <div className="flex-1 w-full">
-                            <label className="text-xs font-semibold text-gray-500 uppercase">{view === 'sales' ? 'Service' : 'Feature Summary'}</label>
-                            <input className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-[#15621B] outline-none text-black" value={input3} onChange={e => setInput3(e.target.value)} required placeholder={view === 'sales' ? "Chatbot" : "Core API"} />
+                            <label className="text-xs font-bold text-gray-700 uppercase">{view === 'sales' ? 'Service' : 'Feature Summary'}</label>
+                            <input className="w-full p-2.5 border border-gray-300 rounded focus:ring-2 focus:ring-[#15621B] outline-none text-gray-900 font-medium placeholder:text-gray-400" value={input3} onChange={e => setInput3(e.target.value)} required placeholder={view === 'sales' ? "Chatbot" : "Core API"} />
                         </div>
                     )}
 
                     <div className="w-32">
-                        <label className="text-xs font-semibold text-gray-500 uppercase">{view === 'sales' ? 'Value' : 'Deadline'}</label>
-                        <input className="w-full p-2 border border-gray-300 rounded focus:ring-2 focus:ring-[#15621B] outline-none text-black" value={input2} onChange={e => setInput2(e.target.value)} required placeholder={view === 'sales' ? "$1000" : "Oct 30"} />
+                        <label className="text-xs font-bold text-gray-700 uppercase">{view === 'sales' ? 'Value' : 'Deadline'}</label>
+                        <input className="w-full p-2.5 border border-gray-300 rounded focus:ring-2 focus:ring-[#15621B] outline-none text-gray-900 font-medium placeholder:text-gray-400" value={input2} onChange={e => setInput2(e.target.value)} required placeholder={view === 'sales' ? "$1000" : "Oct 30"} />
                     </div>
 
                     <div className="flex gap-2">
-                        <button type="button" onClick={resetForm} className="px-4 py-2 text-gray-500 hover:bg-gray-100 rounded">Cancel</button>
-                        <button type="submit" className="px-4 py-2 bg-[#15621B] text-white rounded hover:bg-[#0e4412]">Add</button>
+                        <button type="button" onClick={resetForm} className="px-4 py-2.5 text-gray-600 hover:bg-gray-100 rounded font-medium">Cancel</button>
+                        <button type="submit" className="px-4 py-2.5 bg-[#15621B] text-white rounded hover:bg-[#0e4412] font-bold shadow-sm">Add</button>
                     </div>
                 </form>
             )}
 
             {isLoading ? (
-                <div className="flex-1 flex flex-col items-center justify-center text-gray-400">
+                <div className="flex-1 flex flex-col items-center justify-center text-gray-500">
                     <Loader2 size={32} className="animate-spin mb-2 text-[#15621B]" />
-                    <p>Loading your data...</p>
+                    <p className="font-medium">Loading your data...</p>
                 </div>
             ) : (
                 /* Kanban Board */
                 <div className="flex-1 overflow-x-auto">
                     <div className="flex gap-4 min-w-[1200px] h-full pb-4">
                         {(view === 'sales' ? salesColumns : view === 'marketing' ? marketingColumns : techColumns).map((col) => (
-                            <div key={col} className="flex-1 min-w-[200px] flex flex-col bg-gray-100/50 rounded-xl border border-gray-200">
-                                <div className={`p-3 border-b border-gray-200 flex items-center justify-between bg-gray-50 rounded-t-xl ${view === 'marketing' ? 'border-t-4 border-t-pink-200' : ''} ${view === 'tech' ? 'border-t-4 border-t-gray-300' : ''} ${view === 'sales' ? 'border-t-4 border-t-green-200' : ''}`}>
-                                    <span className="font-bold text-gray-700 text-sm">{col}</span>
-                                    <span className="bg-white text-gray-500 text-xs px-2 py-0.5 rounded-full border border-gray-200">
+                            <div key={col} className="flex-1 min-w-[200px] flex flex-col bg-gray-100 rounded-xl border border-gray-300">
+                                <div className={`p-3 border-b border-gray-300 flex items-center justify-between bg-gray-200/50 rounded-t-xl ${view === 'marketing' ? 'border-t-4 border-t-pink-300' : ''} ${view === 'tech' ? 'border-t-4 border-t-gray-400' : ''} ${view === 'sales' ? 'border-t-4 border-t-green-300' : ''}`}>
+                                    <span className="font-bold text-gray-800 text-sm">{col}</span>
+                                    <span className="bg-white text-gray-700 font-bold text-xs px-2 py-0.5 rounded-full border border-gray-300">
                                         {view === 'sales' ? deals.filter(d => d.status === col).length : view === 'marketing' ? marketingTasks.filter(t => t.status === col).length : projects.filter(p => p.status === col).length}
                                     </span>
                                 </div>
-                                <div className="p-2 space-y-3 flex-1 overflow-y-auto max-h-[600px]">
-                                    {/* Render Cards Logic (Identical to previous but using new async handlers) */}
+                                <div className="p-2 space-y-3 flex-1 overflow-y-auto max-h-[600px] bg-gray-50/50">
+                                    {/* Render Cards Logic */}
                                     {view === 'sales' && deals.filter(d => d.status === col).map(deal => (
-                                        <div key={deal.id} className="bg-white p-3 rounded-lg shadow-sm border border-gray-200 group hover:shadow-md transition-shadow relative">
-                                            <div className="flex justify-between items-start mb-2">
-                                                <h4 className="font-bold text-[#373737]">{deal.clientName}</h4>
-                                                <button onClick={() => deleteItem(deal.id)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={14} /></button>
+                                        <div key={deal.id} className="bg-white p-3 rounded-lg shadow-sm border border-gray-200 group hover:shadow-md transition-shadow relative hover:border-gray-300">
+                                            <div className="flex justify-between items-start mb-1">
+                                                <h4 className="font-bold text-gray-900 text-sm">{deal.clientName}</h4>
+                                                <button onClick={() => deleteItem(deal.id)} className="text-gray-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={14} /></button>
                                             </div>
-                                            <p className="text-xs text-gray-500 mb-3">{deal.service}</p>
-                                            <div className="flex items-center justify-between text-xs font-medium text-gray-600 mb-3">
-                                                <span className="flex items-center gap-1 bg-green-50 text-green-700 px-1.5 py-0.5 rounded"><DollarSign size={10} /> {deal.value}</span>
-                                                <span className="text-gray-400 font-normal">{deal.lastContact}</span>
+                                            <p className="text-xs text-gray-600 font-medium mb-3">{deal.service}</p>
+                                            <div className="flex items-center justify-between text-xs font-medium text-gray-700 mb-3">
+                                                <span className="flex items-center gap-1 bg-green-50 text-green-800 border border-green-100 px-1.5 py-0.5 rounded font-bold"><DollarSign size={10} /> {deal.value}</span>
+                                                <span className="text-gray-500 font-medium">{deal.lastContact}</span>
                                             </div>
                                             <div className="space-y-2">
-                                                <select className="w-full text-xs p-1 border border-gray-200 rounded bg-gray-50 text-gray-600 outline-none focus:border-[#15621B] text-black bg-white" value={deal.status} onChange={(e) => updateDealStatus(deal.id, e.target.value as DealStatus)}>
+                                                <select className="w-full text-xs p-1.5 border border-gray-300 rounded bg-gray-50 text-gray-800 outline-none focus:border-[#15621B] font-medium" value={deal.status} onChange={(e) => updateDealStatus(deal.id, e.target.value as DealStatus)}>
                                                     {salesColumns.map(s => <option key={s} value={s}>{s}</option>)}
                                                 </select>
-                                                <button onClick={() => setAutopilotDeal(deal)} className="w-full flex items-center justify-center gap-1 text-xs bg-[#373737] text-white py-1.5 rounded hover:bg-black transition-colors"><Zap size={12} className="text-[#FBEFD0]" /> Manage / Autopilot</button>
+                                                <button onClick={() => setAutopilotDeal(deal)} className="w-full flex items-center justify-center gap-1 text-xs bg-gray-800 text-white py-1.5 rounded hover:bg-black transition-colors font-bold"><Zap size={12} className="text-[#FBEFD0]" /> Manage / Autopilot</button>
                                             </div>
                                         </div>
                                     ))}
-                                    {/* Marketing & Tech Cards rendered similarly... */}
                                     {view === 'marketing' && marketingTasks.filter(t => t.status === col).map(task => (
                                         <div key={task.id} className="bg-white p-3 rounded-lg shadow-sm border border-gray-200 group hover:shadow-md transition-shadow border-l-4 border-l-pink-500">
-                                            <div className="flex justify-between items-start mb-2">
-                                                <h4 className="font-bold text-[#373737] text-sm line-clamp-2">{task.title}</h4>
-                                                <button onClick={() => deleteItem(task.id)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={14} /></button>
+                                            <div className="flex justify-between items-start mb-1">
+                                                <h4 className="font-bold text-gray-900 text-sm line-clamp-2">{task.title}</h4>
+                                                <button onClick={() => deleteItem(task.id)} className="text-gray-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={14} /></button>
                                             </div>
                                             <div className="flex items-center gap-2 mb-3">
-                                                <span className={`text-xs px-2 py-1 rounded-md flex items-center gap-1 font-medium ${task.platform === 'Instagram' ? 'bg-pink-50 text-pink-700' : 'bg-blue-50 text-blue-700'}`}>{getPlatformIcon(task.platform)} {task.platform}</span>
-                                                <span className="text-xs px-2 py-1 rounded-md bg-gray-100 text-gray-600 flex items-center gap-1">{getTypeIcon(task.contentType)} {task.contentType}</span>
+                                                <span className={`text-xs px-2 py-1 rounded-md flex items-center gap-1 font-bold ${task.platform === 'Instagram' ? 'bg-pink-50 text-pink-800 border border-pink-100' : 'bg-blue-50 text-blue-800 border border-blue-100'}`}>{getPlatformIcon(task.platform)} {task.platform}</span>
+                                                <span className="text-xs px-2 py-1 rounded-md bg-gray-100 text-gray-700 border border-gray-200 flex items-center gap-1 font-medium">{getTypeIcon(task.contentType)} {task.contentType}</span>
                                             </div>
-                                            <div className="flex items-center justify-between text-xs text-gray-400 mb-2"><span className="flex items-center gap-1"><Calendar size={10} /> {task.dueDate}</span></div>
-                                            <select className="w-full text-xs p-1 border border-gray-200 rounded bg-gray-50 text-gray-600 outline-none focus:border-pink-500 text-black bg-white" value={task.status} onChange={(e) => updateMarketingStatus(task.id, e.target.value as MarketingStatus)}>
+                                            <div className="flex items-center justify-between text-xs text-gray-500 mb-2"><span className="flex items-center gap-1 font-medium"><Calendar size={10} /> {task.dueDate}</span></div>
+                                            <select className="w-full text-xs p-1.5 border border-gray-300 rounded bg-gray-50 text-gray-800 outline-none focus:border-pink-500 font-medium" value={task.status} onChange={(e) => updateMarketingStatus(task.id, e.target.value as MarketingStatus)}>
                                                 {marketingColumns.map(s => <option key={s} value={s}>{s}</option>)}
                                             </select>
                                         </div>
                                     ))}
                                     {view === 'tech' && projects.filter(p => p.status === col).map(proj => (
                                         <div key={proj.id} className="bg-white p-3 rounded-lg shadow-sm border border-gray-200 group hover:shadow-md transition-shadow border-l-4 border-l-gray-700">
-                                            <div className="flex justify-between items-start mb-2">
-                                                <h4 className="font-bold text-[#373737]">{proj.clientName}</h4>
-                                                <button onClick={() => deleteItem(proj.id)} className="text-gray-300 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={14} /></button>
+                                            <div className="flex justify-between items-start mb-1">
+                                                <h4 className="font-bold text-gray-900 text-sm">{proj.clientName}</h4>
+                                                <button onClick={() => deleteItem(proj.id)} className="text-gray-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={14} /></button>
                                             </div>
-                                            <p className="text-xs text-gray-500 mb-3 line-clamp-2">{proj.featureSummary}</p>
+                                            <p className="text-xs text-gray-700 mb-3 line-clamp-2 font-medium">{proj.featureSummary}</p>
                                             <div className="flex items-center justify-between text-xs font-medium text-gray-600 mb-3">
-                                                <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded ${proj.status === 'Deployed' ? 'bg-green-100 text-green-800' : 'bg-orange-50 text-orange-700'}`}><Calendar size={10} /> {proj.deadline}</span>
+                                                <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded font-bold border ${proj.status === 'Deployed' ? 'bg-green-100 text-green-800 border-green-200' : 'bg-orange-50 text-orange-800 border-orange-200'}`}><Calendar size={10} /> {proj.deadline}</span>
                                             </div>
-                                            <select className="w-full text-xs p-1 border border-gray-200 rounded bg-gray-50 text-gray-600 outline-none focus:border-[#373737] text-black bg-white" value={proj.status} onChange={(e) => updateProjectStatus(proj.id, e.target.value as ProjectStatus)}>
+                                            <select className="w-full text-xs p-1.5 border border-gray-300 rounded bg-gray-50 text-gray-800 outline-none focus:border-[#373737] font-medium" value={proj.status} onChange={(e) => updateProjectStatus(proj.id, e.target.value as ProjectStatus)}>
                                                 {techColumns.map(s => <option key={s} value={s}>{s}</option>)}
                                             </select>
                                         </div>

@@ -7,7 +7,7 @@ import { DataService } from '../services/storageService';
 import { 
     CheckCircle2, Circle, ArrowRight, FileText, Code2, 
     MessageSquare, Loader2, PlayCircle, ChevronRight, Download, 
-    AlertTriangle, Save, Send, Sparkles, File, Wand2, RotateCcw
+    AlertTriangle, Save, Send, Sparkles, File, Wand2, RotateCcw, Edit2, Eye
 } from 'lucide-react';
 
 interface LifecycleAutopilotProps {
@@ -49,11 +49,13 @@ const LifecycleAutopilot: React.FC<LifecycleAutopilotProps> = ({ deal, onClose, 
     // UI State
     const [loading, setLoading] = useState(false);
     const [refining, setRefining] = useState(false);
+    const [isEditing, setIsEditing] = useState(false); // Manual Edit Mode
     const [chatInput, setChatInput] = useState('');
     const [chatHistory, setChatHistory] = useState<{role: 'user' | 'ai', text: string}[]>([]);
     const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'unsaved'>('saved');
     
     const chatEndRef = useRef<HTMLDivElement>(null);
+    const lastSavedContent = useRef<string>('');
 
     const currentStage = STAGES[currentStageIdx];
     const existingArtifact = artifacts.find(a => a.stage === currentStage.id);
@@ -73,9 +75,11 @@ const LifecycleAutopilot: React.FC<LifecycleAutopilotProps> = ({ deal, onClose, 
             const current = saved.find(a => a.stage === STAGES[currentStageIdx].id);
             if (current) {
                 setCurrentContent(current.content);
+                lastSavedContent.current = current.content;
                 setChatHistory([{ role: 'ai', text: `Loaded previous version of ${currentStage.artifact}.` }]);
             } else {
                 setCurrentContent('');
+                lastSavedContent.current = '';
                 setChatHistory([]);
             }
         };
@@ -87,15 +91,20 @@ const LifecycleAutopilot: React.FC<LifecycleAutopilotProps> = ({ deal, onClose, 
         const art = artifacts.find(a => a.stage === currentStage.id);
         if (art) {
             setCurrentContent(art.content);
+            lastSavedContent.current = art.content;
             setChatHistory([{ role: 'ai', text: `Loaded ${currentStage.artifact}.` }]);
         } else {
             setCurrentContent('');
+            lastSavedContent.current = '';
             setChatHistory([]);
         }
     }, [currentStageIdx, artifacts]);
 
-    // Save Content Helper
+    // --- AUTOSAVE LOGIC ---
+
     const saveCurrentContent = async (content: string) => {
+        if (!content) return;
+        
         setSaveStatus('saving');
         const artifact: DealArtifact = {
             id: existingArtifact ? existingArtifact.id : `${deal.id}_${currentStage.id}_${Date.now()}`,
@@ -108,7 +117,8 @@ const LifecycleAutopilot: React.FC<LifecycleAutopilotProps> = ({ deal, onClose, 
 
         await DataService.saveArtifact(artifact);
         
-        // Update local state list
+        // Update refs and local state
+        lastSavedContent.current = content;
         setArtifacts(prev => {
             const idx = prev.findIndex(a => a.stage === currentStage.id);
             if (idx >= 0) {
@@ -121,6 +131,29 @@ const LifecycleAutopilot: React.FC<LifecycleAutopilotProps> = ({ deal, onClose, 
         
         setSaveStatus('saved');
     };
+
+    // Autosave: Debounce (Save 3s after typing stops)
+    useEffect(() => {
+        if (currentContent !== lastSavedContent.current) {
+            setSaveStatus('unsaved');
+            const timer = setTimeout(() => {
+                saveCurrentContent(currentContent);
+            }, 3000);
+            return () => clearTimeout(timer);
+        }
+    }, [currentContent]);
+
+    // Autosave: Interval (Save every 60s if dirty as safety net)
+    useEffect(() => {
+        const interval = setInterval(() => {
+            if (currentContent !== lastSavedContent.current) {
+                saveCurrentContent(currentContent);
+            }
+        }, 60000);
+        return () => clearInterval(interval);
+    }, [currentContent]);
+
+    // ----------------------
 
     const handleGenerate = async () => {
         setLoading(true);
@@ -207,6 +240,11 @@ const LifecycleAutopilot: React.FC<LifecycleAutopilotProps> = ({ deal, onClose, 
                     {saveStatus === 'saving' && (
                         <div className="flex items-center gap-1 text-xs bg-white/10 px-2 py-1 rounded animate-pulse">
                             <Save size={12} /> Saving...
+                        </div>
+                    )}
+                    {saveStatus === 'unsaved' && (
+                        <div className="flex items-center gap-1 text-xs text-yellow-300 px-2 py-1">
+                            <Circle size={10} fill="currentColor" /> Unsaved Changes
                         </div>
                     )}
                     {saveStatus === 'saved' && (
@@ -298,6 +336,13 @@ const LifecycleAutopilot: React.FC<LifecycleAutopilotProps> = ({ deal, onClose, 
                             </div>
                             {currentContent && (
                                 <div className="flex gap-2">
+                                    <button 
+                                        onClick={() => setIsEditing(!isEditing)}
+                                        className={`p-2 rounded transition-colors ${isEditing ? 'bg-green-100 text-green-700' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-200'}`}
+                                        title={isEditing ? "View Preview" : "Edit Manually"}
+                                    >
+                                        {isEditing ? <Eye size={18} /> : <Edit2 size={18} />}
+                                    </button>
                                     <button onClick={handleDownload} className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-200 rounded transition-colors" title="Download">
                                         <Download size={18} />
                                     </button>
@@ -311,7 +356,7 @@ const LifecycleAutopilot: React.FC<LifecycleAutopilotProps> = ({ deal, onClose, 
                         </div>
 
                         {/* Doc Content / Empty State */}
-                        <div className="flex-1 overflow-y-auto p-8 relative">
+                        <div className="flex-1 overflow-y-auto p-0 relative">
                             {loading && (
                                 <div className="absolute inset-0 bg-white/90 z-20 flex flex-col items-center justify-center">
                                     <Loader2 className="animate-spin text-[#15621B] mb-3" size={40} />
@@ -337,9 +382,18 @@ const LifecycleAutopilot: React.FC<LifecycleAutopilotProps> = ({ deal, onClose, 
                                     </button>
                                 </div>
                             ) : (
-                                <div className="prose prose-sm prose-headings:text-[#373737] max-w-none text-gray-800">
-                                    <ReactMarkdown>{currentContent}</ReactMarkdown>
-                                </div>
+                                isEditing ? (
+                                    <textarea 
+                                        className="w-full h-full p-8 outline-none resize-none font-mono text-sm leading-relaxed text-gray-800"
+                                        value={currentContent}
+                                        onChange={(e) => setCurrentContent(e.target.value)}
+                                        placeholder="Start typing..."
+                                    />
+                                ) : (
+                                    <div className="prose prose-sm prose-headings:text-[#373737] max-w-none text-gray-800 p-8">
+                                        <ReactMarkdown>{currentContent}</ReactMarkdown>
+                                    </div>
+                                )
                             )}
                         </div>
                     </div>

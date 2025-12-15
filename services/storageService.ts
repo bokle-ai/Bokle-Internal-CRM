@@ -110,15 +110,18 @@ export const DataService = {
     },
 
     // --- ARTIFACTS (DOCUMENTS) ---
-    getArtifacts: async (dealId: string): Promise<DealArtifact[]> => {
+    getArtifacts: async (dealId?: string): Promise<DealArtifact[]> => {
         const sb = getSupabase();
         if (sb) {
-            const { data, error } = await sb.from('deal_artifacts').select('*').eq('dealId', dealId);
+            let query = sb.from('deal_artifacts').select('*');
+            if (dealId) query = query.eq('dealId', dealId);
+            
+            const { data, error } = await query;
             if (!error && data) return data as DealArtifact[];
             console.error("Supabase Error (Artifacts):", error);
         }
         const all = parseLocal<DealArtifact[]>(KEYS.ARTIFACTS, []);
-        return all.filter(a => a.dealId === dealId);
+        return dealId ? all.filter(a => a.dealId === dealId) : all;
     },
 
     saveArtifact: async (artifact: DealArtifact) => {
@@ -200,6 +203,34 @@ export const DataService = {
         } else {
             const current = parseLocal<MarketingTask[]>(KEYS.MARKETING, []);
             localStorage.setItem(KEYS.MARKETING, JSON.stringify(current.filter(t => t.id !== id)));
+        }
+    },
+
+    // --- BULK OPERATIONS ---
+    
+    // table: 'deals' | 'projects' | 'marketing_tasks' | 'deal_artifacts'
+    clearTable: async (table: string): Promise<boolean> => {
+        const sb = getSupabase();
+        if (sb) {
+            // Delete all rows where ID is not empty string (effective truncate)
+            const { error } = await sb.from(table).delete().neq('id', 'PLACEHOLDER_ZERO'); 
+            if (error) {
+                console.error(`Error clearing table ${table}:`, error);
+                return false;
+            }
+            return true;
+        } else {
+            const map: Record<string, string> = {
+                'deals': KEYS.DEALS,
+                'projects': KEYS.PROJECTS,
+                'marketing_tasks': KEYS.MARKETING,
+                'deal_artifacts': KEYS.ARTIFACTS
+            };
+            if (map[table]) {
+                localStorage.removeItem(map[table]);
+                return true;
+            }
+            return false;
         }
     },
 

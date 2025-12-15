@@ -7,6 +7,7 @@ import ServiceExplainer from './components/ServiceExplainer';
 import HandoverHelper from './components/HandoverHelper';
 import DocumentGenerator from './components/DocumentGenerator';
 import Integrations from './components/Integrations';
+import StorageManager from './components/StorageManager';
 import CRM from './components/CRM';
 import { IntegrationState } from './types';
 
@@ -33,6 +34,8 @@ function App() {
         return <HandoverHelper />;
       case 'documents':
         return <DocumentGenerator />;
+      case 'storage':
+        return <StorageManager />;
       case 'integrations':
         return <Integrations integrations={integrations} setIntegrations={setIntegrations} />;
       default:
