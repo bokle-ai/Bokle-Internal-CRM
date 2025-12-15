@@ -1,3 +1,4 @@
+
 import { defineConfig, loadEnv } from 'vite';
 import react from '@vitejs/plugin-react';
 
@@ -6,18 +7,21 @@ export default defineConfig(({ mode }) => {
   // Load env file based on `mode` in the current working directory.
   const env = loadEnv(mode, (process as any).cwd(), '');
   
-  // Standardize on AI_API_KEY. Check for API_KEY as a fallback.
-  // We inject this string into the build.
+  // 1. Gemini API Key
   const aiApiKey = env.AI_API_KEY || env.API_KEY || '';
+
+  // 2. Supabase Configuration (Support both VITE_ prefix and standard names for Vercel)
+  const sbUrl = env.VITE_SUPABASE_URL || env.SUPABASE_URL || '';
+  const sbKey = env.VITE_SUPABASE_ANON_KEY || env.SUPABASE_ANON_KEY || '';
 
   return {
     plugins: [react()],
     define: {
-      // 1. Inject the API Key strictly as a string
+      // Inject these variables into the app at build time
       'process.env.AI_API_KEY': JSON.stringify(aiApiKey),
-      // 2. Preserve NODE_ENV to avoid breaking React/Libraries
+      'process.env.VITE_SUPABASE_URL': JSON.stringify(sbUrl),
+      'process.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(sbKey),
       'process.env.NODE_ENV': JSON.stringify(mode),
-      // 3. Polyfill the remaining 'process.env' object safely
       'process.env': {},
     },
   };

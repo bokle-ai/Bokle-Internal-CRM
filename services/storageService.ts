@@ -1,12 +1,13 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { Deal, Project, MarketingTask } from '../types';
+import { Deal, Project, MarketingTask, DealArtifact } from '../types';
 
 // --- CONFIGURATION ---
 const KEYS = {
     DEALS: 'bokle_data_deals',
     PROJECTS: 'bokle_data_projects',
     MARKETING: 'bokle_data_marketing',
+    ARTIFACTS: 'bokle_data_artifacts',
     SUPABASE_URL: 'bokle_sb_url',
     SUPABASE_KEY: 'bokle_sb_key'
 };
@@ -39,11 +40,11 @@ const getSupabase = (): SupabaseClient | null => {
 
     const { url, key } = getSupabaseConfig();
     
-    // Check Env Vars first (for Vercel deployment)
-    // Cast import.meta to any to avoid TypeScript errors when types aren't available
-    const envUrl = (import.meta as any).env?.VITE_SUPABASE_URL;
-    const envKey = (import.meta as any).env?.VITE_SUPABASE_ANON_KEY;
+    // Check Env Vars (Injected via vite.config.ts define)
+    const envUrl = process.env.VITE_SUPABASE_URL || (import.meta as any).env?.VITE_SUPABASE_URL;
+    const envKey = process.env.VITE_SUPABASE_ANON_KEY || (import.meta as any).env?.VITE_SUPABASE_ANON_KEY;
 
+    // Priority: 1. Environment Variables (Vercel), 2. Local Storage (Manual Override)
     const effectiveUrl = envUrl || url;
     const effectiveKey = envKey || key;
 
@@ -108,6 +109,32 @@ export const DataService = {
         }
     },
 
+    // --- ARTIFACTS (DOCUMENTS) ---
+    getArtifacts: async (dealId: string): Promise<DealArtifact[]> => {
+        const sb = getSupabase();
+        if (sb) {
+            const { data, error } = await sb.from('deal_artifacts').select('*').eq('dealId', dealId);
+            if (!error && data) return data as DealArtifact[];
+            console.error("Supabase Error (Artifacts):", error);
+        }
+        const all = parseLocal<DealArtifact[]>(KEYS.ARTIFACTS, []);
+        return all.filter(a => a.dealId === dealId);
+    },
+
+    saveArtifact: async (artifact: DealArtifact) => {
+        const sb = getSupabase();
+        if (sb) {
+            const { error } = await sb.from('deal_artifacts').upsert(artifact);
+            if (error) console.error("Supabase Artifact Save Error:", error);
+        } else {
+            const all = parseLocal<DealArtifact[]>(KEYS.ARTIFACTS, []);
+            const index = all.findIndex(a => a.id === artifact.id);
+            if (index >= 0) all[index] = artifact;
+            else all.push(artifact);
+            localStorage.setItem(KEYS.ARTIFACTS, JSON.stringify(all));
+        }
+    },
+
     // --- PROJECTS ---
     getProjects: async (): Promise<Project[]> => {
         const sb = getSupabase();
@@ -147,9 +174,6 @@ export const DataService = {
         if (sb) {
             const { data, error } = await sb.from('marketing_tasks').select('*');
             if (!error && data) {
-                // Map snake_case DB fields to camelCase TS fields if needed, 
-                // but usually simpler to keep them consistent. 
-                // Assuming DB columns match TS interface for simplicity in this artifact.
                 return data as MarketingTask[];
             }
         }
@@ -184,6 +208,7 @@ export const DataService = {
         deals: parseLocal(KEYS.DEALS, []),
         projects: parseLocal(KEYS.PROJECTS, []),
         marketing: parseLocal(KEYS.MARKETING, []),
+        artifacts: parseLocal(KEYS.ARTIFACTS, []),
         timestamp: new Date().toISOString(),
         version: '1.0'
     }),
@@ -192,5 +217,6 @@ export const DataService = {
         localStorage.removeItem(KEYS.DEALS);
         localStorage.removeItem(KEYS.PROJECTS);
         localStorage.removeItem(KEYS.MARKETING);
+        localStorage.removeItem(KEYS.ARTIFACTS);
     }
 };

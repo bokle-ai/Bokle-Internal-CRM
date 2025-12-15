@@ -57,6 +57,15 @@ export interface MarketingTask {
     dueDate: string;
 }
 
+export interface DealArtifact {
+    id: string;
+    dealId: string;
+    stage: string; // e.g. 'Lead', 'Discovery'
+    title: string; // e.g. 'Sales Script', 'BRD'
+    content: string; // Markdown content
+    lastUpdated: string;
+}
+
 export interface IntegrationState {
     gmail: boolean;
     linkedin: boolean;

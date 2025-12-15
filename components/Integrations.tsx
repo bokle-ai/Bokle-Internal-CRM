@@ -134,16 +134,29 @@ create table public.marketing_tasks (
   "created_at" timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
--- 4. ENABLE ACCESS (Row Level Security)
+-- 4. ARTIFACTS TABLE (For Saved Documents)
+create table public.deal_artifacts (
+  "id" text primary key,
+  "dealId" text,
+  "stage" text,
+  "title" text,
+  "content" text,
+  "lastUpdated" text,
+  "created_at" timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- 5. ENABLE ACCESS (Row Level Security)
 alter table public.deals enable row level security;
 alter table public.projects enable row level security;
 alter table public.marketing_tasks enable row level security;
+alter table public.deal_artifacts enable row level security;
 
--- 5. ALLOW PUBLIC ACCESS (For this internal tool)
+-- 6. ALLOW PUBLIC ACCESS (For this internal tool)
 -- Note: In a real production app with multiple users, you would restrict this.
 create policy "Enable all access" on public.deals for all using (true) with check (true);
 create policy "Enable all access" on public.projects for all using (true) with check (true);
 create policy "Enable all access" on public.marketing_tasks for all using (true) with check (true);
+create policy "Enable all access" on public.deal_artifacts for all using (true) with check (true);
     `.trim();
 
     return (

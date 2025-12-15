@@ -325,3 +325,40 @@ export const generateStageArtifact = async (
         return handleAiError(error, "Autopilot");
     }
 };
+
+export const refineArtifactContent = async (
+    currentContent: string,
+    instructions: string,
+    artifactType: string
+): Promise<string> => {
+    try {
+        const ai = getAiClient();
+        const prompt = `
+        TASK: Rewrite the following ${artifactType} based on the user's specific instructions.
+        
+        CURRENT CONTENT:
+        ${currentContent}
+
+        USER INSTRUCTIONS:
+        "${instructions}"
+
+        REQUIREMENTS:
+        1. Keep the same structure unless asked to change it.
+        2. Only modify what is requested or implied by the instruction.
+        3. Maintain professional tone.
+        4. Return the FULL updated document (not just the changed part).
+        `;
+
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+            config: {
+                systemInstruction: `You are an expert editor for Bokle AI. \n${BOKLE_CONTEXT}`,
+                temperature: 0.7,
+            },
+        });
+        return response.text || "No response generated.";
+    } catch (error: any) {
+        return handleAiError(error, "Refine Artifact");
+    }
+}
