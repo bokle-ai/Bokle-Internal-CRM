@@ -1,10 +1,10 @@
 
 import React, { useState, useEffect } from 'react';
-import { Database, Trash2, RefreshCw, AlertTriangle, FileText, CheckCircle2, Server, Cloud, Package, Users, Megaphone } from 'lucide-react';
+import { Database, Trash2, RefreshCw, AlertTriangle, FileText, CheckCircle2, Server, Cloud, Package, Users, Megaphone, Send } from 'lucide-react';
 import { DataService } from '../services/storageService';
-import { Deal, Project, MarketingTask, DealArtifact } from '../types';
+import { Deal, Project, MarketingTask, DealArtifact, OutreachLead } from '../types';
 
-type Category = 'deals' | 'projects' | 'marketing_tasks' | 'deal_artifacts';
+type Category = 'deals' | 'projects' | 'marketing_tasks' | 'deal_artifacts' | 'outreach_leads';
 
 const StorageManager: React.FC = () => {
     const [activeCategory, setActiveCategory] = useState<Category>('deals');
@@ -17,7 +17,8 @@ const StorageManager: React.FC = () => {
         deals: 0,
         projects: 0,
         marketing: 0,
-        artifacts: 0
+        artifacts: 0,
+        outreach_leads: 0
     });
 
     const refreshData = async () => {
@@ -25,18 +26,20 @@ const StorageManager: React.FC = () => {
         setIsCloud(DataService.isCloudEnabled());
         
         // Fetch All
-        const [d, p, m, a] = await Promise.all([
+        const [d, p, m, a, l] = await Promise.all([
             DataService.getDeals(),
             DataService.getProjects(),
             DataService.getMarketing(),
-            DataService.getArtifacts()
+            DataService.getArtifacts(),
+            DataService.getOutreachLeads()
         ]);
 
         setCounts({
             deals: d.length,
             projects: p.length,
             marketing: m.length,
-            artifacts: a.length
+            artifacts: a.length,
+            outreach_leads: l.length
         });
 
         // Set Active Data
@@ -44,6 +47,7 @@ const StorageManager: React.FC = () => {
         else if (activeCategory === 'projects') setData(p);
         else if (activeCategory === 'marketing_tasks') setData(m);
         else if (activeCategory === 'deal_artifacts') setData(a);
+        else if (activeCategory === 'outreach_leads') setData(l);
 
         setIsLoading(false);
     };
@@ -58,6 +62,7 @@ const StorageManager: React.FC = () => {
         if (activeCategory === 'deals') await DataService.deleteDeal(id);
         else if (activeCategory === 'projects') await DataService.deleteProject(id);
         else if (activeCategory === 'marketing_tasks') await DataService.deleteMarketing(id);
+        else if (activeCategory === 'outreach_leads') await DataService.deleteOutreachLead(id);
         // Artifacts don't have a specific deleteSingle method in service yet
         
         refreshData();
@@ -145,6 +150,28 @@ const StorageManager: React.FC = () => {
                 </>
             );
         }
+        if (activeCategory === 'outreach_leads') {
+            const l = item as OutreachLead;
+            return (
+                <>
+                    <td className="p-4">
+                        <div className="font-bold text-gray-900 text-base">{l.name}</div>
+                        <div className="text-xs text-gray-600 mt-1">{l.role} @ {l.company}</div>
+                    </td>
+                    <td className="p-4 text-gray-800 text-sm truncate max-w-[150px]">{l.email || '-'}</td>
+                    <td className="p-4 text-gray-600 text-sm">{l.createdAt ? new Date(l.createdAt).toLocaleDateString() : '-'}</td>
+                    <td className="p-4">
+                        <span className={`px-3 py-1.5 rounded-full text-xs font-bold border ${
+                            l.status === 'Contacted' ? 'bg-green-100 text-green-800 border-green-200' : 
+                            l.status === 'Generated' ? 'bg-blue-100 text-blue-800 border-blue-200' : 
+                            'bg-gray-100 text-gray-700 border-gray-200'
+                        }`}>
+                            {l.status}
+                        </span>
+                    </td>
+                </>
+            );
+        }
         return null;
     };
 
@@ -152,6 +179,7 @@ const StorageManager: React.FC = () => {
         if (cat === 'deals') return <Users size={24} />;
         if (cat === 'projects') return <Package size={24} />;
         if (cat === 'marketing_tasks') return <Megaphone size={24} />;
+        if (cat === 'outreach_leads') return <Send size={24} />;
         return <FileText size={24} />;
     };
 
@@ -159,6 +187,7 @@ const StorageManager: React.FC = () => {
         if (cat === 'deals') return 'Active Deals';
         if (cat === 'projects') return 'Projects';
         if (cat === 'marketing_tasks') return 'Marketing';
+        if (cat === 'outreach_leads') return 'Outreach Leads';
         return 'Documents';
     };
 
@@ -185,17 +214,18 @@ const StorageManager: React.FC = () => {
             </div>
 
             {/* Stats Cards - Large Click Targets */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                {(['deals', 'projects', 'marketing_tasks', 'deal_artifacts'] as Category[]).map((cat) => {
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+                {(['deals', 'projects', 'marketing_tasks', 'outreach_leads', 'deal_artifacts'] as Category[]).map((cat) => {
                     const isActive = activeCategory === cat;
-                    const count = counts[cat === 'marketing_tasks' ? 'marketing' : cat === 'deal_artifacts' ? 'artifacts' : cat];
+                    // @ts-ignore
+                    const count = counts[cat];
                     
                     return (
                         <button 
                             key={cat}
                             onClick={() => setActiveCategory(cat)}
                             className={`
-                                relative p-6 rounded-2xl border-2 transition-all duration-200 text-left group
+                                relative p-4 rounded-2xl border-2 transition-all duration-200 text-left group
                                 ${isActive 
                                     ? 'bg-gray-900 border-gray-900 text-white shadow-lg scale-[1.02]' 
                                     : 'bg-white border-gray-200 text-gray-600 hover:border-gray-400 hover:bg-gray-50'}
@@ -204,10 +234,10 @@ const StorageManager: React.FC = () => {
                             <div className={`mb-3 ${isActive ? 'text-[#FBEFD0]' : 'text-gray-400 group-hover:text-gray-600'}`}>
                                 {getCategoryIcon(cat)}
                             </div>
-                            <div className={`text-3xl font-extrabold ${isActive ? 'text-white' : 'text-gray-900'}`}>
+                            <div className={`text-2xl font-extrabold ${isActive ? 'text-white' : 'text-gray-900'}`}>
                                 {count}
                             </div>
-                            <div className={`text-sm font-bold uppercase tracking-wider mt-1 ${isActive ? 'text-gray-300' : 'text-gray-500'}`}>
+                            <div className={`text-xs font-bold uppercase tracking-wider mt-1 truncate ${isActive ? 'text-gray-300' : 'text-gray-500'}`}>
                                 {getCategoryLabel(cat)}
                             </div>
                         </button>

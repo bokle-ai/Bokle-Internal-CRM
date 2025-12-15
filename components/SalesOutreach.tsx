@@ -1,87 +1,154 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { generateOutreachSequence, analyzeProspectList, researchCompany } from '../services/geminiService';
-import { IntegrationState } from '../types';
-import { Loader2, Mail, Linkedin, Copy, Check, Upload, FileSpreadsheet, Download, RefreshCw, Send, Globe, Sparkles, Instagram, X } from 'lucide-react';
+import { generateOutreachSequence, researchCompany } from '../services/geminiService';
+import { DataService } from '../services/storageService';
+import { IntegrationState, OutreachLead } from '../types';
+import { Loader2, Mail, Linkedin, Copy, Check, Upload, FileSpreadsheet, Send, Search, Sparkles, User, RefreshCw, X, Instagram } from 'lucide-react';
 
-type Mode = 'outreach' | 'bulk';
-
-interface ProcessedProspect {
-    id: number;
-    name: string;
-    company: string;
-    role: string;
-    status: 'pending' | 'generating' | 'done' | 'error';
-    sequence?: string;
-}
+type Mode = 'generator' | 'manager';
 
 interface SalesOutreachProps {
     integrations?: IntegrationState;
 }
 
 const SalesOutreach: React.FC<SalesOutreachProps> = ({ integrations }) => {
-    const [mode, setMode] = useState<Mode>('outreach');
+    const [mode, setMode] = useState<Mode>('manager');
     
-    // Single Outreach State
-    const [prospectName, setProspectName] = useState('');
-    const [role, setRole] = useState('');
-    const [company, setCompany] = useState('');
-    const [painPoint, setPainPoint] = useState('');
-    const [websiteUrl, setWebsiteUrl] = useState('');
-    const [instagramHandle, setInstagramHandle] = useState('');
-    const [isResearching, setIsResearching] = useState(false);
+    // --- MODE: SINGLE GENERATOR ---
+    const [genName, setGenName] = useState('');
+    const [genRole, setGenRole] = useState('');
+    const [genCompany, setGenCompany] = useState('');
+    const [genPain, setGenPain] = useState('');
+    const [genOutput, setGenOutput] = useState('');
+    const [genLoading, setGenLoading] = useState(false);
+    
+    // --- MODE: LEAD MANAGER ---
+    const [leads, setLeads] = useState<OutreachLead[]>([]);
+    const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
+    const [isLoadingLeads, setIsLoadingLeads] = useState(false);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [isImporting, setIsImporting] = useState(false);
+    
+    // Action States
+    const [isProcessingAction, setIsProcessingAction] = useState(false);
+    const [editingSequence, setEditingSequence] = useState(false);
+    const [tempSequence, setTempSequence] = useState('');
 
-    // Bulk Mode State
-    const [csvFile, setCsvFile] = useState<File | null>(null);
-    const [prospects, setProspects] = useState<ProcessedProspect[]>([]);
-    const [listAnalysis, setListAnalysis] = useState('');
-    const [isAnalyzing, setIsAnalyzing] = useState(false);
-    const [isProcessingBatch, setIsProcessingBatch] = useState(false);
-
-    const [output, setOutput] = useState('');
-    const [loading, setLoading] = useState(false);
-    const [copied, setCopied] = useState(false);
-
-    // Email Modal State
+    // Shared: Email Modal
     const [showEmailModal, setShowEmailModal] = useState(false);
     const [emailDraft, setEmailDraft] = useState({ to: '', subject: '', body: '' });
 
-    // Handlers
-    const handleGenerate = async (e: React.FormEvent) => {
-        e.preventDefault();
-        setLoading(true);
-        setOutput('');
-        
-        try {
-            const result = await generateOutreachSequence(prospectName, role, company, painPoint);
-            setOutput(result);
-        } catch (error) {
-            console.error(error);
-            setOutput("Failed to generate sequence.");
-        }
-        setLoading(false);
+    // Load Leads on Mount
+    useEffect(() => {
+        loadLeads();
+    }, []);
+
+    const loadLeads = async () => {
+        setIsLoadingLeads(true);
+        const data = await DataService.getOutreachLeads();
+        setLeads(data);
+        setIsLoadingLeads(false);
     };
 
-    const handleResearchUrl = async () => {
-        if (!websiteUrl) return;
-        setIsResearching(true);
-        
+    // --- CSV IMPORT ---
+    const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = async (evt) => {
+            const text = evt.target?.result as string;
+            const lines = text.split('\n').filter(l => l.trim());
+            const headers = lines[0].toLowerCase().split(',');
+            
+            const nameIdx = headers.findIndex(h => h.includes('name'));
+            const companyIdx = headers.findIndex(h => h.includes('company') || h.includes('account'));
+            const roleIdx = headers.findIndex(h => h.includes('title') || h.includes('role') || h.includes('position'));
+            const emailIdx = headers.findIndex(h => h.includes('email'));
+            const webIdx = headers.findIndex(h => h.includes('web') || h.includes('url'));
+
+            setIsImporting(true);
+            
+            // Process rows
+            for (let i = 1; i < lines.length; i++) {
+                // Handle quoted CSV strings
+                const values = lines[i].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || [];
+                const simpleValues = lines[i].split(',');
+                const vals = values.length > simpleValues.length ? values : simpleValues;
+
+                const name = (vals[nameIdx]?.replace(/['"]+/g, '') || "Unknown").trim();
+                
+                if (name && name !== "Unknown") {
+                    const newLead: OutreachLead = {
+                        id: `lead_${Date.now()}_${i}`,
+                        name: name,
+                        company: (vals[companyIdx]?.replace(/['"]+/g, '') || "Unknown Company").trim(),
+                        role: (vals[roleIdx]?.replace(/['"]+/g, '') || "Unknown Role").trim(),
+                        email: (vals[emailIdx]?.replace(/['"]+/g, '') || "").trim(),
+                        website: (vals[webIdx]?.replace(/['"]+/g, '') || "").trim(),
+                        status: 'New',
+                        createdAt: new Date().toISOString()
+                    };
+                    await DataService.saveOutreachLead(newLead);
+                }
+            }
+            
+            await loadLeads();
+            setIsImporting(false);
+            e.target.value = ''; // Reset input
+        };
+        reader.readAsText(file);
+    };
+
+    // --- ACTIONS ---
+    const selectedLead = leads.find(l => l.id === selectedLeadId);
+
+    const handleGenerateForLead = async (lead: OutreachLead) => {
+        setIsProcessingAction(true);
         try {
-            const data = await researchCompany(websiteUrl);
-            if (data.company && !company) setCompany(data.company);
-            if (data.painPoint) setPainPoint(data.painPoint);
+            // If we have a website, research it briefly first for context
+            let pain = lead.painPoint;
+            if (!pain && lead.website) {
+                 const res = await researchCompany(lead.website);
+                 pain = res.painPoint || "Generic Growth";
+            } else if (!pain) {
+                pain = "Manual Sales processes";
+            }
+
+            const seq = await generateOutreachSequence(lead.name, lead.role, lead.company, pain);
+            
+            const updatedLead: OutreachLead = {
+                ...lead,
+                painPoint: pain,
+                generatedSequence: seq,
+                status: 'Generated'
+            };
+            
+            await DataService.saveOutreachLead(updatedLead);
+            setLeads(prev => prev.map(l => l.id === lead.id ? updatedLead : l));
         } catch (e) {
-            console.error("Research failed", e);
+            console.error("Gen Error", e);
+            alert("Failed to generate sequence");
+        } finally {
+            setIsProcessingAction(false);
         }
-        
-        setIsResearching(false);
     };
 
-    const handleCopy = (text: string) => {
-        navigator.clipboard.writeText(text);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+    const handleSaveSequence = async () => {
+        if (!selectedLead) return;
+        const updatedLead: OutreachLead = { ...selectedLead, generatedSequence: tempSequence };
+        await DataService.saveOutreachLead(updatedLead);
+        setLeads(prev => prev.map(l => l.id === selectedLead.id ? updatedLead : l));
+        setEditingSequence(false);
+    };
+
+    const handleDeleteLead = async (id: string) => {
+        if(window.confirm("Delete this lead?")) {
+            await DataService.deleteOutreachLead(id);
+            if (selectedLeadId === id) setSelectedLeadId(null);
+            setLeads(prev => prev.filter(l => l.id !== id));
+        }
     };
 
     const initiateEmail = (content: string, prospectEmail: string = "") => {
@@ -104,7 +171,7 @@ const SalesOutreach: React.FC<SalesOutreachProps> = ({ integrations }) => {
         setShowEmailModal(true);
     };
 
-    const sendEmail = (method: 'default' | 'gmail') => {
+    const sendEmail = async (method: 'default' | 'gmail') => {
         const { to, subject, body } = emailDraft;
         
         if (method === 'gmail') {
@@ -114,420 +181,242 @@ const SalesOutreach: React.FC<SalesOutreachProps> = ({ integrations }) => {
             const mailtoLink = `mailto:${to}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
             window.location.href = mailtoLink;
         }
+
+        // Update Status
+        if (selectedLead) {
+            const updated: OutreachLead = { ...selectedLead, status: 'Contacted' };
+            await DataService.saveOutreachLead(updated);
+            setLeads(prev => prev.map(l => l.id === selectedLead.id ? updated : l));
+        }
+
         setShowEmailModal(false);
     };
 
-    const handleOpenLinkedIn = (name: string) => {
-        const url = `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(name)}`;
-        window.open(url, '_blank');
-    };
-
-    const handleOpenInstagram = () => {
-        if (instagramHandle) {
-            window.open(`https://www.instagram.com/${instagramHandle.replace('@', '')}/`, '_blank');
-        } else {
-            // Search via Google as fallback because IG search is auth-gated sometimes
-            window.open(`https://www.google.com/search?q=site:instagram.com+${encodeURIComponent(prospectName)}+${encodeURIComponent(company)}`, '_blank');
-        }
-    };
-
-    // CSV Handlers
-    const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            setCsvFile(file);
-            const reader = new FileReader();
-            reader.onload = (evt) => {
-                const text = evt.target?.result as string;
-                parseCSV(text);
-            };
-            reader.readAsText(file);
-        }
-    };
-
-    const parseCSV = (text: string) => {
-        const lines = text.split('\n').filter(l => l.trim());
-        const headers = lines[0].toLowerCase().split(',');
-        
-        const nameIdx = headers.findIndex(h => h.includes('name'));
-        const companyIdx = headers.findIndex(h => h.includes('company') || h.includes('account'));
-        const roleIdx = headers.findIndex(h => h.includes('title') || h.includes('role') || h.includes('position'));
-        
-        // FIXED: Removed the .slice(1, 11) limit. Now processes all lines.
-        const parsed: ProcessedProspect[] = lines.slice(1).map((line, idx) => {
-            // Regex to handle CSVs with quoted strings containing commas
-            const values = line.match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || []; 
-            const simpleValues = line.split(',');
-            const vals = values.length > simpleValues.length ? values : simpleValues;
-            
-            return {
-                id: idx,
-                name: (vals[nameIdx]?.replace(/['"]+/g, '') || "Unknown"),
-                company: (vals[companyIdx]?.replace(/['"]+/g, '') || "Unknown Company"),
-                role: (vals[roleIdx]?.replace(/['"]+/g, '') || "Unknown Role"),
-                status: 'pending' as const
-            };
-        }).filter(p => p.name !== "Unknown");
-
-        setProspects(parsed);
-        setListAnalysis('');
-    };
-
-    const handleAnalyzeList = async () => {
-        if (prospects.length === 0) return;
-        setIsAnalyzing(true);
-        // Only send a summary of first 20 to AI to avoid context limit, but strategy applies to all
-        const summary = prospects.slice(0, 20).map(p => `${p.role} at ${p.company}`).join('\n');
-        const analysis = await analyzeProspectList(summary);
-        setListAnalysis(analysis);
-        setIsAnalyzing(false);
-    };
-
-    const handleProcessBatch = async () => {
-        if (!listAnalysis) {
-            alert("Please analyze the list first to generate a strategy.");
-            return;
-        }
-        setIsProcessingBatch(true);
-        const newProspects = [...prospects];
-        
-        for (let i = 0; i < newProspects.length; i++) {
-            newProspects[i].status = 'generating';
-            setProspects([...newProspects]); 
-
-            const p = newProspects[i];
-            const strategyContext = "Based on this analysis: " + listAnalysis.substring(0, 200) + "..."; 
-            
-            try {
-                const seq = await generateOutreachSequence(p.name, p.role, p.company, `Derived from Analysis: ${strategyContext}`);
-                newProspects[i].sequence = seq;
-                newProspects[i].status = 'done';
-            } catch (e) {
-                newProspects[i].status = 'error';
-            }
-            
-            setProspects([...newProspects]);
-            // Small delay to prevent rate limits
-            await new Promise(r => setTimeout(r, 1000));
-        }
-        setIsProcessingBatch(false);
-    };
-
-    const handleDownloadResults = () => {
-        const header = "Name,Company,Role,Sequence\n";
-        const rows = prospects.map(p => 
-            `"${p.name}","${p.company}","${p.role}","${(p.sequence || '').replace(/"/g, '""')}"`
-        ).join('\n');
-        const blob = new Blob([header + rows], { type: 'text/csv' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'bokle_generated_sequences.csv';
-        a.click();
-    };
+    // --- RENDER HELPERS ---
+    const filteredLeads = leads.filter(l => 
+        l.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+        l.company.toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
     return (
-        <div className="space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="space-y-6 h-[calc(100vh-140px)] flex flex-col">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 shrink-0">
                 <div>
                     <h2 className="text-2xl font-bold text-[#373737]">Sales Outreach</h2>
-                    <p className="text-gray-500">Generate personalized sequences or bulk process CSV leads.</p>
+                    <p className="text-gray-500">Manage your pipeline and generate AI sequences.</p>
                 </div>
                 
-                <div className="flex bg-white p-1 rounded-lg border border-gray-200 overflow-x-auto">
-                    <button onClick={() => { setMode('outreach'); setOutput(''); }} className={`whitespace-nowrap px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-all ${mode === 'outreach' ? 'bg-[#15621B] text-white shadow-sm' : 'text-gray-600 hover:bg-gray-50'}`}>
-                        <Mail size={16} /> Single Sequence
+                <div className="flex bg-gray-100 p-1 rounded-lg border border-gray-200">
+                    <button onClick={() => setMode('manager')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${mode === 'manager' ? 'bg-white text-[#15621B] shadow-sm' : 'text-gray-600'}`}>
+                        Lead Manager (Bulk)
                     </button>
-                    <button onClick={() => { setMode('bulk'); setOutput(''); }} className={`whitespace-nowrap px-4 py-2 rounded-md text-sm font-medium flex items-center gap-2 transition-all ${mode === 'bulk' ? 'bg-[#15621B] text-white shadow-sm' : 'text-gray-600 hover:bg-gray-50'}`}>
-                        <FileSpreadsheet size={16} /> Bulk Import (CSV)
+                    <button onClick={() => setMode('generator')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${mode === 'generator' ? 'bg-white text-[#15621B] shadow-sm' : 'text-gray-600'}`}>
+                        Quick Generator
                     </button>
                 </div>
             </div>
 
-            {mode === 'bulk' ? (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                    {/* LEFT COLUMN: UPLOAD & LIST */}
-                    <div className="lg:col-span-1 space-y-6">
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
-                            <h3 className="font-bold text-lg mb-4 text-[#15621B]">1. Import Data</h3>
-                            {!csvFile ? (
-                                <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 flex flex-col items-center text-center hover:bg-gray-50 transition-colors">
-                                    <Upload size={32} className="text-gray-400 mb-2" />
-                                    <p className="text-sm text-gray-600 mb-2">Upload Apollo.io CSV export</p>
-                                    <input type="file" accept=".csv" onChange={handleFileUpload} className="text-xs text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-xs file:font-semibold file:bg-green-50 file:text-green-700 hover:file:bg-green-100" />
+            {mode === 'manager' ? (
+                <div className="flex-1 flex gap-6 overflow-hidden">
+                    {/* LEFT: LIST */}
+                    <div className="w-1/3 bg-white rounded-xl border border-gray-200 flex flex-col shadow-sm">
+                        <div className="p-4 border-b border-gray-100 flex gap-2">
+                            <div className="relative flex-1">
+                                <Search size={16} className="absolute left-3 top-3 text-gray-400" />
+                                <input 
+                                    className="w-full pl-9 p-2 bg-gray-50 border border-gray-200 rounded-lg text-sm outline-none focus:border-[#15621B]"
+                                    placeholder="Search leads..."
+                                    value={searchTerm}
+                                    onChange={e => setSearchTerm(e.target.value)}
+                                />
+                            </div>
+                            <label className="bg-[#15621B] hover:bg-[#0e4412] text-white p-2 rounded-lg cursor-pointer transition-colors flex items-center justify-center min-w-[40px]">
+                                {isImporting ? <Loader2 size={18} className="animate-spin" /> : <Upload size={18} />}
+                                <input type="file" accept=".csv" className="hidden" onChange={handleFileUpload} disabled={isImporting} />
+                            </label>
+                        </div>
+                        
+                        <div className="flex-1 overflow-y-auto">
+                            {isLoadingLeads ? (
+                                <div className="p-8 text-center text-gray-500"><Loader2 className="animate-spin mx-auto mb-2" />Loading...</div>
+                            ) : filteredLeads.length === 0 ? (
+                                <div className="p-8 text-center text-gray-400 text-sm">
+                                    No leads found. <br/> Upload a CSV to get started.
                                 </div>
                             ) : (
-                                <div className="bg-green-50 p-4 rounded-lg flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <FileSpreadsheet size={20} className="text-green-700" />
-                                        <div className="text-sm">
-                                            <p className="font-medium text-gray-900">{csvFile.name}</p>
-                                            <p className="text-gray-500">{prospects.length} prospects loaded</p>
-                                        </div>
-                                    </div>
-                                    <button onClick={() => { setCsvFile(null); setProspects([]); setListAnalysis(''); }} className="text-gray-400 hover:text-red-500">×</button>
-                                </div>
-                            )}
-
-                            {prospects.length > 0 && (
-                                <div className="mt-4 space-y-3">
-                                    <button 
-                                        onClick={handleAnalyzeList} 
-                                        disabled={isAnalyzing || !!listAnalysis}
-                                        className="w-full bg-[#373737] text-white py-2 px-4 rounded-md font-medium hover:bg-black transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
+                                filteredLeads.map(lead => (
+                                    <button
+                                        key={lead.id}
+                                        onClick={() => {
+                                            setSelectedLeadId(lead.id);
+                                            setEditingSequence(false);
+                                        }}
+                                        className={`w-full text-left p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors flex justify-between items-center group ${selectedLeadId === lead.id ? 'bg-blue-50/50 border-l-4 border-l-[#15621B]' : 'border-l-4 border-l-transparent'}`}
                                     >
-                                        {isAnalyzing ? <Loader2 className="animate-spin" size={16} /> : <RefreshCw size={16} />}
-                                        {listAnalysis ? 'Analysis Complete' : '2. Analyze List'}
+                                        <div className="min-w-0">
+                                            <div className="font-bold text-gray-900 text-sm truncate">{lead.name}</div>
+                                            <div className="text-xs text-gray-500 truncate">{lead.company}</div>
+                                        </div>
+                                        <div className="flex items-center gap-2">
+                                             {lead.status === 'New' && <span className="w-2 h-2 rounded-full bg-red-400" title="New" />}
+                                             {lead.status === 'Generated' && <span className="w-2 h-2 rounded-full bg-blue-400" title="Ready" />}
+                                             {lead.status === 'Contacted' && <Check size={14} className="text-green-600" />}
+                                        </div>
                                     </button>
-
-                                    {listAnalysis && (
-                                        <button 
-                                            onClick={handleProcessBatch}
-                                            disabled={isProcessingBatch}
-                                            className="w-full bg-[#15621B] text-white py-2 px-4 rounded-md font-medium hover:bg-[#0e4412] transition-colors flex items-center justify-center gap-2 disabled:opacity-50"
-                                        >
-                                            {isProcessingBatch ? <Loader2 className="animate-spin" size={16} /> : <Mail size={16} />}
-                                            3. Generate Sequences
-                                        </button>
-                                    )}
-                                </div>
+                                ))
                             )}
                         </div>
-
-                        {prospects.length > 0 && (
-                            <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-                                <div className="px-4 py-3 border-b border-gray-100 bg-gray-50 flex justify-between items-center">
-                                    <h4 className="font-bold text-gray-700 text-sm">Prospects ({prospects.length})</h4>
-                                    {prospects.some(p => p.status === 'done') && (
-                                        <button onClick={handleDownloadResults} className="text-xs flex items-center gap-1 text-[#15621B] hover:underline font-medium">
-                                            <Download size={12} /> Export
-                                        </button>
-                                    )}
-                                </div>
-                                <div className="max-h-[400px] overflow-y-auto">
-                                    {prospects.map((p) => (
-                                        <div key={p.id} className={`p-3 border-b border-gray-100 text-sm ${p.status === 'generating' ? 'bg-yellow-50' : p.status === 'done' ? 'bg-green-50' : 'bg-white'}`}>
-                                            <div className="flex justify-between items-start mb-2">
-                                                <div>
-                                                    <div className="font-medium text-gray-900">{p.name}</div>
-                                                    <div className="text-gray-500 text-xs">{p.role} @ {p.company}</div>
-                                                </div>
-                                                <div className="text-xs">
-                                                    {p.status === 'pending' && <span className="text-gray-400">Waiting</span>}
-                                                    {p.status === 'generating' && <Loader2 size={14} className="animate-spin text-yellow-600" />}
-                                                    {p.status === 'done' && <Check size={14} className="text-green-600" />}
-                                                </div>
-                                            </div>
-                                            {/* Action Buttons for Batch Item */}
-                                            {p.status === 'done' && p.sequence && (
-                                                <div className="flex gap-2 mt-1 flex-wrap">
-                                                    {integrations?.gmail && (
-                                                        <button 
-                                                            onClick={() => initiateEmail(p.sequence!)}
-                                                            className="text-xs flex items-center gap-1 bg-green-100 text-green-700 px-2 py-1 rounded hover:bg-green-200"
-                                                        >
-                                                            <Mail size={12} /> Email
-                                                        </button>
-                                                    )}
-                                                    {integrations?.linkedin && (
-                                                        <button 
-                                                            onClick={() => handleOpenLinkedIn(p.name)}
-                                                            className="text-xs flex items-center gap-1 bg-blue-100 text-blue-700 px-2 py-1 rounded hover:bg-blue-200"
-                                                        >
-                                                            <Linkedin size={12} /> LinkedIn
-                                                        </button>
-                                                    )}
-                                                    {integrations?.instagram && (
-                                                        <button 
-                                                            onClick={() => window.open(`https://www.google.com/search?q=site:instagram.com+${encodeURIComponent(p.name)}+${encodeURIComponent(p.company)}`, '_blank')}
-                                                            className="text-xs flex items-center gap-1 bg-pink-100 text-pink-700 px-2 py-1 rounded hover:bg-pink-200"
-                                                        >
-                                                            <Instagram size={12} /> Search IG
-                                                        </button>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
+                        <div className="p-2 border-t border-gray-100 text-xs text-center text-gray-400">
+                            {filteredLeads.length} Leads
+                        </div>
                     </div>
 
-                    <div className="lg:col-span-2 space-y-6">
-                        {listAnalysis ? (
-                            <div className="bg-[#FBEFD0] p-6 rounded-xl border border-[#e6dcc0]">
-                                <h3 className="font-bold text-[#15621B] mb-2 flex items-center gap-2">
-                                    <RefreshCw size={18} /> List Strategy Analysis
-                                </h3>
-                                <div className="prose prose-sm prose-p:text-[#373737] max-w-none">
-                                    <ReactMarkdown>{listAnalysis}</ReactMarkdown>
+                    {/* RIGHT: DETAIL */}
+                    <div className="flex-1 bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col overflow-hidden">
+                        {selectedLead ? (
+                            <>
+                                {/* Lead Header */}
+                                <div className="p-6 border-b border-gray-100 bg-gray-50 flex justify-between items-start">
+                                    <div>
+                                        <h3 className="text-xl font-bold text-gray-900">{selectedLead.name}</h3>
+                                        <div className="text-gray-600 text-sm font-medium flex items-center gap-2 mt-1">
+                                            {selectedLead.role} <span className="text-gray-300">|</span> {selectedLead.company}
+                                        </div>
+                                        <div className="flex items-center gap-4 mt-3 text-xs text-gray-500">
+                                            {selectedLead.email && <span className="flex items-center gap-1"><Mail size={12} /> {selectedLead.email}</span>}
+                                            {selectedLead.status === 'Contacted' && <span className="text-green-600 font-bold bg-green-100 px-2 py-0.5 rounded-full">Contacted</span>}
+                                        </div>
+                                    </div>
+                                    <div className="flex gap-2">
+                                        {/* Status Actions */}
+                                        <button onClick={() => handleDeleteLead(selectedLead.id)} className="text-gray-400 hover:text-red-500 p-2"><X size={18} /></button>
+                                    </div>
                                 </div>
-                            </div>
-                        ) : (
-                            <div className="bg-gray-50 border border-dashed border-gray-300 rounded-xl h-32 flex items-center justify-center text-gray-400 text-sm">
-                                Import a CSV and click "Analyze List" to see strategy insights here.
-                            </div>
-                        )}
 
-                        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 min-h-[400px]">
-                            <h3 className="font-bold text-lg mb-4 text-[#15621B]">Generated Sequences</h3>
-                            {prospects.some(p => p.sequence) ? (
-                                <div className="space-y-6">
-                                    {prospects.filter(p => p.sequence).map(p => (
-                                        <div key={p.id} className="border border-gray-200 rounded-lg p-4">
-                                            <div className="flex justify-between items-center mb-2 border-b border-gray-100 pb-2">
-                                                <h4 className="font-bold text-gray-800">{p.name} <span className="text-gray-400 font-normal">({p.company})</span></h4>
+                                {/* Content Area */}
+                                <div className="flex-1 overflow-y-auto p-6">
+                                    {selectedLead.status === 'New' && !selectedLead.generatedSequence ? (
+                                        <div className="h-full flex flex-col items-center justify-center text-center">
+                                            <Sparkles className="text-[#15621B] mb-4 opacity-80" size={48} />
+                                            <h4 className="font-bold text-gray-800 text-lg mb-2">Ready to Glide?</h4>
+                                            <p className="text-gray-500 max-w-sm mb-6">Generate a personalized sequence for {selectedLead.name} based on their role and company.</p>
+                                            <button 
+                                                onClick={() => handleGenerateForLead(selectedLead)}
+                                                disabled={isProcessingAction}
+                                                className="bg-[#15621B] text-white px-6 py-3 rounded-lg font-bold shadow-md hover:bg-[#0e4412] transition-colors disabled:opacity-50 flex items-center gap-2"
+                                            >
+                                                {isProcessingAction ? <Loader2 className="animate-spin" /> : <RefreshCw size={18} />}
+                                                Generate Sequence
+                                            </button>
+                                        </div>
+                                    ) : (
+                                        <div className="h-full flex flex-col">
+                                            <div className="flex justify-between items-center mb-4">
+                                                <h4 className="font-bold text-gray-700 text-sm uppercase">Outreach Sequence</h4>
                                                 <div className="flex gap-2">
-                                                    {integrations?.gmail && (
-                                                        <button onClick={() => initiateEmail(p.sequence!)} className="text-green-600 hover:text-green-800" title="Send Email">
-                                                            <Mail size={18} />
+                                                    {!editingSequence ? (
+                                                        <button 
+                                                            onClick={() => {
+                                                                setTempSequence(selectedLead.generatedSequence || '');
+                                                                setEditingSequence(true);
+                                                            }}
+                                                            className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded font-medium"
+                                                        >
+                                                            Edit
+                                                        </button>
+                                                    ) : (
+                                                        <button 
+                                                            onClick={handleSaveSequence}
+                                                            className="text-xs bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded font-bold"
+                                                        >
+                                                            Save
                                                         </button>
                                                     )}
-                                                    <button onClick={() => handleCopy(p.sequence!)} className="text-gray-400 hover:text-[#15621B]">
-                                                        <Copy size={16} />
-                                                    </button>
                                                 </div>
                                             </div>
-                                            <div className="prose prose-sm max-w-none text-gray-700">
-                                                <ReactMarkdown>{p.sequence!}</ReactMarkdown>
+
+                                            {editingSequence ? (
+                                                <textarea 
+                                                    className="flex-1 w-full p-4 border border-gray-300 rounded-lg outline-none focus:border-[#15621B] resize-none font-mono text-sm"
+                                                    value={tempSequence}
+                                                    onChange={e => setTempSequence(e.target.value)}
+                                                />
+                                            ) : (
+                                                <div className="prose prose-sm max-w-none text-gray-800 bg-white flex-1 overflow-y-auto pr-2">
+                                                    <ReactMarkdown>{selectedLead.generatedSequence || ''}</ReactMarkdown>
+                                                </div>
+                                            )}
+
+                                            <div className="mt-6 pt-4 border-t border-gray-100 flex justify-end gap-3">
+                                                 <button 
+                                                    onClick={() => navigator.clipboard.writeText(selectedLead.generatedSequence || '')}
+                                                    className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium text-sm flex items-center gap-2"
+                                                >
+                                                    <Copy size={16} /> Copy
+                                                </button>
+                                                {integrations?.gmail && (
+                                                    <button 
+                                                        onClick={() => initiateEmail(selectedLead.generatedSequence || '', selectedLead.email)}
+                                                        className="px-4 py-2 bg-[#15621B] text-white rounded-lg hover:bg-[#0e4412] font-bold text-sm flex items-center gap-2 shadow-sm"
+                                                    >
+                                                        <Mail size={16} /> Send Email
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
-                                    ))}
+                                    )}
                                 </div>
-                            ) : (
-                                <div className="flex flex-col items-center justify-center h-64 text-gray-400">
-                                    <Mail size={48} className="mb-4 opacity-20" />
-                                    <p>Sequences will appear here after processing.</p>
-                                </div>
-                            )}
-                        </div>
+                            </>
+                        ) : (
+                            <div className="h-full flex flex-col items-center justify-center text-gray-400">
+                                <User size={48} className="mb-4 opacity-20" />
+                                <p>Select a lead to view details.</p>
+                            </div>
+                        )}
                     </div>
                 </div>
             ) : (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 h-fit">
-                        <h3 className="font-bold text-lg mb-4 text-[#15621B]">Prospect Details</h3>
-                        
-                        <form onSubmit={handleGenerate} className="space-y-4">
-                            {/* Website Scraper */}
-                            <div className="bg-blue-50 p-3 rounded-md border border-blue-100">
-                                <label className="block text-xs font-bold text-blue-800 mb-1 uppercase">Have a website?</label>
-                                <div className="flex gap-2">
-                                    <input 
-                                        type="url" 
-                                        className="w-full p-2 border border-blue-200 rounded text-sm focus:ring-2 focus:ring-blue-400 outline-none text-black" 
-                                        placeholder="https://company.com" 
-                                        value={websiteUrl} 
-                                        onChange={(e) => setWebsiteUrl(e.target.value)} 
-                                    />
-                                    <button 
-                                        type="button"
-                                        onClick={handleResearchUrl}
-                                        disabled={isResearching || !websiteUrl}
-                                        className="bg-blue-600 text-white px-3 rounded font-medium text-xs hover:bg-blue-700 transition-colors disabled:opacity-50 flex items-center gap-1 whitespace-nowrap"
-                                    >
-                                        {isResearching ? <Loader2 size={12} className="animate-spin" /> : <Sparkles size={12} />}
-                                        Analyze
-                                    </button>
-                                </div>
-                            </div>
-
-                            <div className="grid grid-cols-2 gap-4">
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Prospect Name</label>
-                                    <input type="text" className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#15621B] outline-none text-black" placeholder="John Doe" value={prospectName} onChange={(e) => setProspectName(e.target.value)} required />
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
-                                    <input type="text" className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#15621B] outline-none text-black" placeholder="Founder / CEO" value={role} onChange={(e) => setRole(e.target.value)} required />
-                                </div>
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Company</label>
-                                <input type="text" className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#15621B] outline-none text-black" placeholder="Acme Inc." value={company} onChange={(e) => setCompany(e.target.value)} required />
-                            </div>
-                            
-                            {integrations?.instagram && (
-                                <div>
-                                    <label className="block text-sm font-medium text-gray-700 mb-1">Instagram Handle <span className="text-gray-400 font-normal">(Optional)</span></label>
-                                    <div className="relative">
-                                        <Instagram size={16} className="absolute left-3 top-3 text-gray-400" />
-                                        <input type="text" className="w-full pl-9 p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#15621B] outline-none text-black" placeholder="@username" value={instagramHandle} onChange={(e) => setInstagramHandle(e.target.value)} />
-                                    </div>
-                                </div>
-                            )}
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-1">Suspected Pain Point</label>
-                                <textarea rows={3} className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-[#15621B] outline-none resize-none text-black" placeholder="e.g. Slow landing page" value={painPoint} onChange={(e) => setPainPoint(e.target.value)} required />
-                            </div>
-                            <button type="submit" disabled={loading} className="w-full bg-[#15621B] text-white py-2 px-4 rounded-md font-medium hover:bg-[#0e4412] transition-colors flex items-center justify-center gap-2">
-                                {loading ? <Loader2 className="animate-spin" size={20} /> : <Send size={20} />}
-                                Generate Sequence
-                            </button>
-                        </form>
-                    </div>
-
-                    <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 min-h-[400px] flex flex-col">
-                        <div className="flex items-center justify-between mb-4">
-                            <h3 className="font-bold text-lg text-[#15621B]">Outreach Sequence</h3>
-                            {output && (
-                                <div className="flex gap-2">
-                                    {integrations?.gmail && (
-                                        <button 
-                                            onClick={() => initiateEmail(output)}
-                                            className="text-white bg-green-600 hover:bg-green-700 px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-2 transition-colors"
-                                        >
-                                            <Mail size={14} /> Email
-                                        </button>
-                                    )}
-                                    {integrations?.linkedin && (
-                                        <button 
-                                            onClick={() => handleOpenLinkedIn(prospectName)}
-                                            className="text-white bg-blue-600 hover:bg-blue-700 px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-2 transition-colors"
-                                        >
-                                            <Linkedin size={14} /> LinkedIn
-                                        </button>
-                                    )}
-                                    {integrations?.instagram && (
-                                        <button 
-                                            onClick={handleOpenInstagram}
-                                            className="text-white bg-pink-600 hover:bg-pink-700 px-3 py-1.5 rounded-md text-sm font-medium flex items-center gap-2 transition-colors"
-                                        >
-                                            <Instagram size={14} /> Instagram
-                                        </button>
-                                    )}
-                                    <button 
-                                        onClick={() => handleCopy(output)}
-                                        className="text-gray-400 hover:text-[#15621B] transition-colors"
-                                        title="Copy to clipboard"
-                                    >
-                                        {copied ? <Check size={18} className="text-green-600" /> : <Copy size={18} />}
-                                    </button>
-                                </div>
-                            )}
+                // MODE: GENERATOR (Simplified from previous version)
+                <div className="flex-1 bg-white p-6 rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col md:flex-row gap-6">
+                    <div className="w-full md:w-1/3 space-y-4">
+                        <h3 className="font-bold text-lg text-[#15621B]">Quick Generator</h3>
+                         <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Prospect Name</label>
+                            <input className="w-full p-2 border border-gray-300 rounded focus:border-[#15621B] outline-none" value={genName} onChange={e => setGenName(e.target.value)} />
                         </div>
-                        
-                        {output ? (
-                            <div className="prose prose-sm prose-headings:text-[#373737] prose-a:text-[#15621B] text-gray-800 max-w-none overflow-y-auto max-h-[600px] pr-2 flex-1">
-                                <ReactMarkdown>{output}</ReactMarkdown>
-                            </div>
-                        ) : (
-                            <div className="flex flex-col items-center justify-center h-full text-gray-400 min-h-[300px]">
-                                <div className="flex gap-2 mb-4 opacity-20">
-                                    <Mail size={48} />
-                                    <Linkedin size={48} />
-                                </div>
-                                <p className="text-center max-w-xs">Enter prospect info (or use Website Analyzer) to get a personalized Email & LinkedIn sequence.</p>
-                            </div>
-                        )}
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Company</label>
+                            <input className="w-full p-2 border border-gray-300 rounded focus:border-[#15621B] outline-none" value={genCompany} onChange={e => setGenCompany(e.target.value)} />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Role</label>
+                            <input className="w-full p-2 border border-gray-300 rounded focus:border-[#15621B] outline-none" value={genRole} onChange={e => setGenRole(e.target.value)} />
+                        </div>
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Pain Point</label>
+                            <input className="w-full p-2 border border-gray-300 rounded focus:border-[#15621B] outline-none" value={genPain} onChange={e => setGenPain(e.target.value)} />
+                        </div>
+                        <button 
+                            onClick={async () => {
+                                setGenLoading(true);
+                                const res = await generateOutreachSequence(genName, genRole, genCompany, genPain);
+                                setGenOutput(res);
+                                setGenLoading(false);
+                            }}
+                            disabled={genLoading}
+                            className="w-full bg-[#15621B] text-white py-2 rounded font-bold hover:bg-[#0e4412]"
+                        >
+                            {genLoading ? 'Generating...' : 'Generate'}
+                        </button>
+                    </div>
+                    <div className="flex-1 bg-gray-50 rounded-lg p-6 border border-gray-200 overflow-y-auto prose prose-sm max-w-none">
+                        {genOutput ? <ReactMarkdown>{genOutput}</ReactMarkdown> : <div className="text-gray-400 text-center mt-20">Generated content will appear here</div>}
                     </div>
                 </div>
             )}
 
-            {/* Email Composer Modal */}
-            {showEmailModal && (
+             {/* Email Composer Modal */}
+             {showEmailModal && (
                 <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
                     <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200">
                         <div className="bg-gray-50 border-b border-gray-200 px-6 py-4 flex justify-between items-center">

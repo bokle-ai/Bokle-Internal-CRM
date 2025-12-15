@@ -1,6 +1,6 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { Deal, Project, MarketingTask, DealArtifact } from '../types';
+import { Deal, Project, MarketingTask, DealArtifact, OutreachLead } from '../types';
 
 // --- CONFIGURATION ---
 const KEYS = {
@@ -8,6 +8,7 @@ const KEYS = {
     PROJECTS: 'bokle_data_projects',
     MARKETING: 'bokle_data_marketing',
     ARTIFACTS: 'bokle_data_artifacts',
+    LEADS: 'bokle_data_outreach_leads',
     SUPABASE_URL: 'bokle_sb_url',
     SUPABASE_KEY: 'bokle_sb_key'
 };
@@ -206,9 +207,43 @@ export const DataService = {
         }
     },
 
+    // --- OUTREACH LEADS (NEW) ---
+    getOutreachLeads: async (): Promise<OutreachLead[]> => {
+        const sb = getSupabase();
+        if (sb) {
+            const { data, error } = await sb.from('outreach_leads').select('*').order('created_at', { ascending: false });
+            if (!error && data) return data as OutreachLead[];
+        }
+        return parseLocal<OutreachLead[]>(KEYS.LEADS, []).sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    },
+
+    saveOutreachLead: async (lead: OutreachLead) => {
+        const sb = getSupabase();
+        if (sb) {
+            const { error } = await sb.from('outreach_leads').upsert(lead);
+            if (error) console.error("Supabase Save Lead Error:", error);
+        } else {
+            const current = parseLocal<OutreachLead[]>(KEYS.LEADS, []);
+            const index = current.findIndex(l => l.id === lead.id);
+            if (index >= 0) current[index] = lead;
+            else current.push(lead);
+            localStorage.setItem(KEYS.LEADS, JSON.stringify(current));
+        }
+    },
+
+    deleteOutreachLead: async (id: string) => {
+        const sb = getSupabase();
+        if (sb) {
+            await sb.from('outreach_leads').delete().eq('id', id);
+        } else {
+            const current = parseLocal<OutreachLead[]>(KEYS.LEADS, []);
+            localStorage.setItem(KEYS.LEADS, JSON.stringify(current.filter(l => l.id !== id)));
+        }
+    },
+
     // --- BULK OPERATIONS ---
     
-    // table: 'deals' | 'projects' | 'marketing_tasks' | 'deal_artifacts'
+    // table: 'deals' | 'projects' | 'marketing_tasks' | 'deal_artifacts' | 'outreach_leads'
     clearTable: async (table: string): Promise<boolean> => {
         const sb = getSupabase();
         if (sb) {
@@ -224,7 +259,8 @@ export const DataService = {
                 'deals': KEYS.DEALS,
                 'projects': KEYS.PROJECTS,
                 'marketing_tasks': KEYS.MARKETING,
-                'deal_artifacts': KEYS.ARTIFACTS
+                'deal_artifacts': KEYS.ARTIFACTS,
+                'outreach_leads': KEYS.LEADS
             };
             if (map[table]) {
                 localStorage.removeItem(map[table]);
@@ -240,8 +276,9 @@ export const DataService = {
         projects: parseLocal(KEYS.PROJECTS, []),
         marketing: parseLocal(KEYS.MARKETING, []),
         artifacts: parseLocal(KEYS.ARTIFACTS, []),
+        outreach_leads: parseLocal(KEYS.LEADS, []),
         timestamp: new Date().toISOString(),
-        version: '1.0'
+        version: '1.1'
     }),
 
     clearLocalData: () => {
@@ -249,5 +286,6 @@ export const DataService = {
         localStorage.removeItem(KEYS.PROJECTS);
         localStorage.removeItem(KEYS.MARKETING);
         localStorage.removeItem(KEYS.ARTIFACTS);
+        localStorage.removeItem(KEYS.LEADS);
     }
 };

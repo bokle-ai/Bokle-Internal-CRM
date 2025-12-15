@@ -145,18 +145,35 @@ create table public.deal_artifacts (
   "created_at" timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
--- 5. ENABLE ACCESS (Row Level Security)
+-- 5. OUTREACH LEADS TABLE (For Bulk Import & Sequences)
+create table public.outreach_leads (
+  "id" text primary key,
+  "name" text,
+  "company" text,
+  "role" text,
+  "email" text,
+  "website" text,
+  "status" text,
+  "painPoint" text,
+  "generatedSequence" text,
+  "createdAt" text,
+  "created_at" timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+-- 6. ENABLE ACCESS (Row Level Security)
 alter table public.deals enable row level security;
 alter table public.projects enable row level security;
 alter table public.marketing_tasks enable row level security;
 alter table public.deal_artifacts enable row level security;
+alter table public.outreach_leads enable row level security;
 
--- 6. ALLOW PUBLIC ACCESS (For this internal tool)
+-- 7. ALLOW PUBLIC ACCESS (For this internal tool)
 -- Note: In a real production app with multiple users, you would restrict this.
 create policy "Enable all access" on public.deals for all using (true) with check (true);
 create policy "Enable all access" on public.projects for all using (true) with check (true);
 create policy "Enable all access" on public.marketing_tasks for all using (true) with check (true);
 create policy "Enable all access" on public.deal_artifacts for all using (true) with check (true);
+create policy "Enable all access" on public.outreach_leads for all using (true) with check (true);
     `.trim();
 
     return (

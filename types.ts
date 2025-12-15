@@ -66,6 +66,19 @@ export interface DealArtifact {
     lastUpdated: string;
 }
 
+export interface OutreachLead {
+    id: string;
+    name: string;
+    company: string;
+    role: string;
+    email?: string;
+    website?: string;
+    status: 'New' | 'Generated' | 'Contacted';
+    painPoint?: string; // Inferred or Manual
+    generatedSequence?: string;
+    createdAt: string;
+}
+
 export interface IntegrationState {
     gmail: boolean;
     linkedin: boolean;
