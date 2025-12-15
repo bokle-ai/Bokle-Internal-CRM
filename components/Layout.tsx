@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { LayoutDashboard, PhoneCall, Handshake, FileText, Code2, Menu, X, Users, Settings, Database } from 'lucide-react';
+import { LayoutDashboard, PhoneCall, Handshake, FileText, Code2, Menu, X, Users, Settings, Database, Mail } from 'lucide-react';
 
 interface LayoutProps {
     children: React.ReactNode;
@@ -15,9 +15,9 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
         { id: 'crm', label: 'CRM & Pipeline', icon: Users },
         { id: 'sales', label: 'Call Assistant', icon: PhoneCall },
+        { id: 'outreach', label: 'Sales Outreach', icon: Mail },
         { id: 'explainer', label: 'Service Explainer', icon: Handshake },
         { id: 'handover', label: 'Tech Handover', icon: Code2 },
-        { id: 'documents', label: 'Doc Generator', icon: FileText },
         { id: 'storage', label: 'Data Storage', icon: Database },
         { id: 'integrations', label: 'Integrations', icon: Settings },
     ];

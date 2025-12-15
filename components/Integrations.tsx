@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { Mail, Linkedin, CheckCircle2, AlertCircle, Key, Trash2, Database, Download, RefreshCw, Cloud } from 'lucide-react';
+import { Mail, Linkedin, CheckCircle2, AlertCircle, Key, Trash2, Database, Download, RefreshCw, Cloud, Instagram, Workflow } from 'lucide-react';
 import { IntegrationState } from '../types';
 import { getStoredApiKey, removeApiKey, saveApiKey, checkConfiguration } from '../services/geminiService';
 import { DataService, getSupabaseConfig, saveSupabaseConfig, clearSupabaseConfig } from '../services/storageService';
@@ -41,7 +41,7 @@ const Integrations: React.FC<IntegrationsProps> = ({ integrations, setIntegratio
         }
     }, []);
 
-    const toggleIntegration = (platform: 'gmail' | 'linkedin') => {
+    const toggleIntegration = (platform: 'gmail' | 'linkedin' | 'instagram') => {
         setIntegrations(prev => ({ ...prev, [platform]: !prev[platform] }));
     };
 
@@ -164,6 +164,77 @@ create policy "Enable all access" on public.deal_artifacts for all using (true) 
             <div>
                 <h2 className="text-2xl font-bold text-[#373737]">Integrations & Settings</h2>
                 <p className="text-gray-600 font-medium">Connect your accounts and manage your database.</p>
+            </div>
+
+            {/* Workflow Integrations */}
+            <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+                <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 bg-blue-50 text-blue-700 rounded-lg flex items-center justify-center shrink-0">
+                        <Workflow size={24} />
+                    </div>
+                    <div className="flex-1">
+                        <h3 className="text-lg font-bold text-gray-900">Workflow Integrations</h3>
+                        <p className="text-gray-700 text-sm mb-4 font-medium">
+                            Enable quick actions for your sales outreach.
+                        </p>
+
+                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            {/* Gmail */}
+                            <button 
+                                onClick={() => toggleIntegration('gmail')}
+                                className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${
+                                    integrations.gmail 
+                                        ? 'bg-red-50 border-red-200 text-red-900' 
+                                        : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
+                                }`}
+                            >
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${integrations.gmail ? 'bg-red-100' : 'bg-gray-100'}`}>
+                                    <Mail size={16} className={integrations.gmail ? 'text-red-600' : 'text-gray-400'} />
+                                </div>
+                                <div className="text-left">
+                                    <div className="text-sm font-bold">Gmail / Email</div>
+                                    <div className="text-xs">{integrations.gmail ? 'Enabled' : 'Disabled'}</div>
+                                </div>
+                            </button>
+
+                            {/* LinkedIn */}
+                            <button 
+                                onClick={() => toggleIntegration('linkedin')}
+                                className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${
+                                    integrations.linkedin 
+                                        ? 'bg-blue-50 border-blue-200 text-blue-900' 
+                                        : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
+                                }`}
+                            >
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${integrations.linkedin ? 'bg-blue-100' : 'bg-gray-100'}`}>
+                                    <Linkedin size={16} className={integrations.linkedin ? 'text-blue-600' : 'text-gray-400'} />
+                                </div>
+                                <div className="text-left">
+                                    <div className="text-sm font-bold">LinkedIn</div>
+                                    <div className="text-xs">{integrations.linkedin ? 'Enabled' : 'Disabled'}</div>
+                                </div>
+                            </button>
+
+                            {/* Instagram */}
+                            <button 
+                                onClick={() => toggleIntegration('instagram')}
+                                className={`flex items-center gap-3 p-3 rounded-lg border transition-all ${
+                                    integrations.instagram 
+                                        ? 'bg-pink-50 border-pink-200 text-pink-900' 
+                                        : 'bg-white border-gray-200 text-gray-500 hover:border-gray-300'
+                                }`}
+                            >
+                                <div className={`w-8 h-8 rounded-full flex items-center justify-center ${integrations.instagram ? 'bg-pink-100' : 'bg-gray-100'}`}>
+                                    <Instagram size={16} className={integrations.instagram ? 'text-pink-600' : 'text-gray-400'} />
+                                </div>
+                                <div className="text-left">
+                                    <div className="text-sm font-bold">Instagram</div>
+                                    <div className="text-xs">{integrations.instagram ? 'Enabled' : 'Disabled'}</div>
+                                </div>
+                            </button>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             {/* Supabase Section */}

@@ -3,9 +3,9 @@ import React, { useState } from 'react';
 import Layout from './components/Layout';
 import Dashboard from './components/Dashboard';
 import SalesAssistant from './components/SalesAssistant';
+import SalesOutreach from './components/SalesOutreach';
 import ServiceExplainer from './components/ServiceExplainer';
 import HandoverHelper from './components/HandoverHelper';
-import DocumentGenerator from './components/DocumentGenerator';
 import Integrations from './components/Integrations';
 import StorageManager from './components/StorageManager';
 import CRM from './components/CRM';
@@ -17,7 +17,8 @@ function App() {
   // Store integration state at App level
   const [integrations, setIntegrations] = useState<IntegrationState>({
       gmail: false,
-      linkedin: false
+      linkedin: false,
+      instagram: false
   });
 
   const renderContent = () => {
@@ -28,12 +29,12 @@ function App() {
         return <CRM />;
       case 'sales':
         return <SalesAssistant integrations={integrations} />;
+      case 'outreach':
+        return <SalesOutreach integrations={integrations} />;
       case 'explainer':
         return <ServiceExplainer />;
       case 'handover':
         return <HandoverHelper />;
-      case 'documents':
-        return <DocumentGenerator />;
       case 'storage':
         return <StorageManager />;
       case 'integrations':

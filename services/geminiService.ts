@@ -187,6 +187,57 @@ export const analyzeProspectList = async (
     }
 };
 
+export const researchCompany = async (url: string): Promise<{ company: string, painPoint: string }> => {
+    try {
+        const ai = getAiClient();
+        const prompt = `
+        Research the company website: ${url}.
+        
+        I need you to extract or infer:
+        1. The Company Name.
+        2. A very short summary of what they do.
+        3. A likely "Pain Point" that Bokle AI (AI Automation Agency) could solve for them.
+        
+        Bokle Services to match against:
+        - Sales/Marketing AI (Lead scoring, chatbots)
+        - Retail/Ecom AI (Product descriptions, pricing)
+        
+        Return ONLY a string in this specific format (do not use JSON, just text lines):
+        Name: [Company Name]
+        Summary: [1 sentence summary]
+        PainPoint: [Likely pain point]
+        `;
+
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+            config: {
+                tools: [{googleSearch: {}}],
+                systemInstruction: `You are a research assistant.`,
+                temperature: 0.3,
+            },
+        });
+
+        const text = response.text || "";
+        
+        // Simple parse
+        const nameMatch = text.match(/Name:\s*(.*)/i);
+        const ppMatch = text.match(/PainPoint:\s*(.*)/i);
+
+        return {
+            company: nameMatch ? nameMatch[1].trim() : "",
+            painPoint: ppMatch ? ppMatch[1].trim() : ""
+        };
+
+    } catch (error: any) {
+        console.error("Research Error:", error);
+        return {
+            company: "",
+            painPoint: "Could not analyze URL automatically. Please enter details manually."
+        };
+    }
+};
+
 export const explainService = async (
     serviceName: string,
     clientContext: string

@@ -69,4 +69,5 @@ export interface DealArtifact {
 export interface IntegrationState {
     gmail: boolean;
     linkedin: boolean;
+    instagram: boolean;
 }

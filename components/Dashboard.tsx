@@ -127,7 +127,7 @@ const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
                 )}
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 <div 
                     onClick={() => setActiveTab('crm')}
                     className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer group"
@@ -159,17 +159,6 @@ const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
                     </div>
                     <h3 className="text-xl font-bold text-gray-800 mb-2">Handover to Tech</h3>
                     <p className="text-gray-500 text-sm">Generate technical tickets for the dev team.</p>
-                </div>
-
-                <div 
-                    onClick={() => setActiveTab('documents')}
-                    className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow cursor-pointer group"
-                >
-                    <div className="w-12 h-12 bg-yellow-50 text-yellow-600 rounded-lg flex items-center justify-center mb-4 group-hover:bg-[#FBEFD0] group-hover:text-[#15621B] transition-colors">
-                        <FileText />
-                    </div>
-                    <h3 className="text-xl font-bold text-gray-800 mb-2">Create Proposal</h3>
-                    <p className="text-gray-500 text-sm">Draft proposals and contracts instantly.</p>
                 </div>
             </div>
 

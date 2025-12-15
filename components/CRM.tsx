@@ -348,69 +348,91 @@ const CRM: React.FC = () => {
                 /* Kanban Board */
                 <div className="flex-1 overflow-x-auto">
                     <div className="flex gap-4 min-w-[1200px] h-full pb-4">
-                        {(view === 'sales' ? salesColumns : view === 'marketing' ? marketingColumns : techColumns).map((col) => (
-                            <div key={col} className="flex-1 min-w-[200px] flex flex-col bg-gray-100 rounded-xl border border-gray-300">
-                                <div className={`p-3 border-b border-gray-300 flex items-center justify-between bg-gray-200/50 rounded-t-xl ${view === 'marketing' ? 'border-t-4 border-t-pink-300' : ''} ${view === 'tech' ? 'border-t-4 border-t-gray-400' : ''} ${view === 'sales' ? 'border-t-4 border-t-green-300' : ''}`}>
-                                    <span className="font-bold text-gray-800 text-sm">{col}</span>
-                                    <span className="bg-white text-gray-700 font-bold text-xs px-2 py-0.5 rounded-full border border-gray-300">
-                                        {view === 'sales' ? deals.filter(d => d.status === col).length : view === 'marketing' ? marketingTasks.filter(t => t.status === col).length : projects.filter(p => p.status === col).length}
-                                    </span>
-                                </div>
-                                <div className="p-2 space-y-3 flex-1 overflow-y-auto max-h-[600px] bg-gray-50/50">
-                                    {/* Render Cards Logic */}
-                                    {view === 'sales' && deals.filter(d => d.status === col).map(deal => (
-                                        <div key={deal.id} className="bg-white p-3 rounded-lg shadow-sm border border-gray-200 group hover:shadow-md transition-shadow relative hover:border-gray-300">
-                                            <div className="flex justify-between items-start mb-1">
-                                                <h4 className="font-bold text-gray-900 text-sm">{deal.clientName}</h4>
-                                                <button onClick={() => deleteItem(deal.id)} className="text-gray-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={14} /></button>
+                        {(view === 'sales' ? salesColumns : view === 'marketing' ? marketingColumns : techColumns).map((col) => {
+                            // Helper for styles
+                            let headerStyle = '';
+                            let titleColor = '';
+                            let badgeStyle = '';
+                            let columnBorder = 'border-gray-200';
+                            
+                            if (view === 'sales') {
+                                headerStyle = 'bg-[#15621B]/10 border-t-[#15621B] border-b-[#15621B]/10';
+                                titleColor = 'text-[#15621B]';
+                                badgeStyle = 'bg-[#15621B] text-white border-transparent';
+                            } else if (view === 'marketing') {
+                                headerStyle = 'bg-pink-50 border-t-pink-500 border-b-pink-100';
+                                titleColor = 'text-pink-700';
+                                badgeStyle = 'bg-pink-500 text-white border-transparent';
+                            } else {
+                                headerStyle = 'bg-[#373737]/5 border-t-[#373737] border-b-[#373737]/10';
+                                titleColor = 'text-[#373737]';
+                                badgeStyle = 'bg-[#373737] text-white border-transparent';
+                            }
+
+                            return (
+                                <div key={col} className={`flex-1 min-w-[200px] flex flex-col bg-gray-50/50 rounded-xl border ${columnBorder}`}>
+                                    <div className={`p-3 border-b flex items-center justify-between rounded-t-xl border-t-4 ${headerStyle}`}>
+                                        <span className={`font-bold text-sm ${titleColor}`}>{col}</span>
+                                        <span className={`font-bold text-xs px-2 py-0.5 rounded-full border ${badgeStyle}`}>
+                                            {view === 'sales' ? deals.filter(d => d.status === col).length : view === 'marketing' ? marketingTasks.filter(t => t.status === col).length : projects.filter(p => p.status === col).length}
+                                        </span>
+                                    </div>
+                                    <div className="p-2 space-y-3 flex-1 overflow-y-auto max-h-[600px]">
+                                        {/* Render Cards Logic */}
+                                        {view === 'sales' && deals.filter(d => d.status === col).map(deal => (
+                                            <div key={deal.id} className="bg-white p-3 rounded-lg shadow-sm border border-gray-200 group hover:shadow-md transition-shadow relative hover:border-gray-300">
+                                                <div className="flex justify-between items-start mb-1">
+                                                    <h4 className="font-bold text-gray-900 text-sm">{deal.clientName}</h4>
+                                                    <button onClick={() => deleteItem(deal.id)} className="text-gray-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={14} /></button>
+                                                </div>
+                                                <p className="text-xs text-gray-600 font-medium mb-3">{deal.service}</p>
+                                                <div className="flex items-center justify-between text-xs font-medium text-gray-700 mb-3">
+                                                    <span className="flex items-center gap-1 bg-green-50 text-green-800 border border-green-100 px-1.5 py-0.5 rounded font-bold"><DollarSign size={10} /> {deal.value}</span>
+                                                    <span className="text-gray-500 font-medium">{deal.lastContact}</span>
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <select className="w-full text-xs p-1.5 border border-gray-300 rounded bg-gray-50 text-gray-800 outline-none focus:border-[#15621B] font-medium" value={deal.status} onChange={(e) => updateDealStatus(deal.id, e.target.value as DealStatus)}>
+                                                        {salesColumns.map(s => <option key={s} value={s}>{s}</option>)}
+                                                    </select>
+                                                    <button onClick={() => setAutopilotDeal(deal)} className="w-full flex items-center justify-center gap-1 text-xs bg-gray-800 text-white py-1.5 rounded hover:bg-black transition-colors font-bold"><Zap size={12} className="text-[#FBEFD0]" /> Manage / Autopilot</button>
+                                                </div>
                                             </div>
-                                            <p className="text-xs text-gray-600 font-medium mb-3">{deal.service}</p>
-                                            <div className="flex items-center justify-between text-xs font-medium text-gray-700 mb-3">
-                                                <span className="flex items-center gap-1 bg-green-50 text-green-800 border border-green-100 px-1.5 py-0.5 rounded font-bold"><DollarSign size={10} /> {deal.value}</span>
-                                                <span className="text-gray-500 font-medium">{deal.lastContact}</span>
-                                            </div>
-                                            <div className="space-y-2">
-                                                <select className="w-full text-xs p-1.5 border border-gray-300 rounded bg-gray-50 text-gray-800 outline-none focus:border-[#15621B] font-medium" value={deal.status} onChange={(e) => updateDealStatus(deal.id, e.target.value as DealStatus)}>
-                                                    {salesColumns.map(s => <option key={s} value={s}>{s}</option>)}
+                                        ))}
+                                        {view === 'marketing' && marketingTasks.filter(t => t.status === col).map(task => (
+                                            <div key={task.id} className="bg-white p-3 rounded-lg shadow-sm border border-gray-200 group hover:shadow-md transition-shadow border-l-4 border-l-pink-500">
+                                                <div className="flex justify-between items-start mb-1">
+                                                    <h4 className="font-bold text-gray-900 text-sm line-clamp-2">{task.title}</h4>
+                                                    <button onClick={() => deleteItem(task.id)} className="text-gray-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={14} /></button>
+                                                </div>
+                                                <div className="flex items-center gap-2 mb-3">
+                                                    <span className={`text-xs px-2 py-1 rounded-md flex items-center gap-1 font-bold ${task.platform === 'Instagram' ? 'bg-pink-50 text-pink-800 border border-pink-100' : 'bg-blue-50 text-blue-800 border border-blue-100'}`}>{getPlatformIcon(task.platform)} {task.platform}</span>
+                                                    <span className="text-xs px-2 py-1 rounded-md bg-gray-100 text-gray-700 border border-gray-200 flex items-center gap-1 font-medium">{getTypeIcon(task.contentType)} {task.contentType}</span>
+                                                </div>
+                                                <div className="flex items-center justify-between text-xs text-gray-500 mb-2"><span className="flex items-center gap-1 font-medium"><Calendar size={10} /> {task.dueDate}</span></div>
+                                                <select className="w-full text-xs p-1.5 border border-gray-300 rounded bg-gray-50 text-gray-800 outline-none focus:border-pink-500 font-medium" value={task.status} onChange={(e) => updateMarketingStatus(task.id, e.target.value as MarketingStatus)}>
+                                                    {marketingColumns.map(s => <option key={s} value={s}>{s}</option>)}
                                                 </select>
-                                                <button onClick={() => setAutopilotDeal(deal)} className="w-full flex items-center justify-center gap-1 text-xs bg-gray-800 text-white py-1.5 rounded hover:bg-black transition-colors font-bold"><Zap size={12} className="text-[#FBEFD0]" /> Manage / Autopilot</button>
                                             </div>
-                                        </div>
-                                    ))}
-                                    {view === 'marketing' && marketingTasks.filter(t => t.status === col).map(task => (
-                                        <div key={task.id} className="bg-white p-3 rounded-lg shadow-sm border border-gray-200 group hover:shadow-md transition-shadow border-l-4 border-l-pink-500">
-                                            <div className="flex justify-between items-start mb-1">
-                                                <h4 className="font-bold text-gray-900 text-sm line-clamp-2">{task.title}</h4>
-                                                <button onClick={() => deleteItem(task.id)} className="text-gray-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={14} /></button>
+                                        ))}
+                                        {view === 'tech' && projects.filter(p => p.status === col).map(proj => (
+                                            <div key={proj.id} className="bg-white p-3 rounded-lg shadow-sm border border-gray-200 group hover:shadow-md transition-shadow border-l-4 border-l-gray-700">
+                                                <div className="flex justify-between items-start mb-1">
+                                                    <h4 className="font-bold text-gray-900 text-sm">{proj.clientName}</h4>
+                                                    <button onClick={() => deleteItem(proj.id)} className="text-gray-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={14} /></button>
+                                                </div>
+                                                <p className="text-xs text-gray-700 mb-3 line-clamp-2 font-medium">{proj.featureSummary}</p>
+                                                <div className="flex items-center justify-between text-xs font-medium text-gray-600 mb-3">
+                                                    <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded font-bold border ${proj.status === 'Deployed' ? 'bg-green-100 text-green-800 border-green-200' : 'bg-orange-50 text-orange-800 border-orange-200'}`}><Calendar size={10} /> {proj.deadline}</span>
+                                                </div>
+                                                <select className="w-full text-xs p-1.5 border border-gray-300 rounded bg-gray-50 text-gray-800 outline-none focus:border-[#373737] font-medium" value={proj.status} onChange={(e) => updateProjectStatus(proj.id, e.target.value as ProjectStatus)}>
+                                                    {techColumns.map(s => <option key={s} value={s}>{s}</option>)}
+                                                </select>
                                             </div>
-                                            <div className="flex items-center gap-2 mb-3">
-                                                <span className={`text-xs px-2 py-1 rounded-md flex items-center gap-1 font-bold ${task.platform === 'Instagram' ? 'bg-pink-50 text-pink-800 border border-pink-100' : 'bg-blue-50 text-blue-800 border border-blue-100'}`}>{getPlatformIcon(task.platform)} {task.platform}</span>
-                                                <span className="text-xs px-2 py-1 rounded-md bg-gray-100 text-gray-700 border border-gray-200 flex items-center gap-1 font-medium">{getTypeIcon(task.contentType)} {task.contentType}</span>
-                                            </div>
-                                            <div className="flex items-center justify-between text-xs text-gray-500 mb-2"><span className="flex items-center gap-1 font-medium"><Calendar size={10} /> {task.dueDate}</span></div>
-                                            <select className="w-full text-xs p-1.5 border border-gray-300 rounded bg-gray-50 text-gray-800 outline-none focus:border-pink-500 font-medium" value={task.status} onChange={(e) => updateMarketingStatus(task.id, e.target.value as MarketingStatus)}>
-                                                {marketingColumns.map(s => <option key={s} value={s}>{s}</option>)}
-                                            </select>
-                                        </div>
-                                    ))}
-                                    {view === 'tech' && projects.filter(p => p.status === col).map(proj => (
-                                        <div key={proj.id} className="bg-white p-3 rounded-lg shadow-sm border border-gray-200 group hover:shadow-md transition-shadow border-l-4 border-l-gray-700">
-                                            <div className="flex justify-between items-start mb-1">
-                                                <h4 className="font-bold text-gray-900 text-sm">{proj.clientName}</h4>
-                                                <button onClick={() => deleteItem(proj.id)} className="text-gray-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={14} /></button>
-                                            </div>
-                                            <p className="text-xs text-gray-700 mb-3 line-clamp-2 font-medium">{proj.featureSummary}</p>
-                                            <div className="flex items-center justify-between text-xs font-medium text-gray-600 mb-3">
-                                                <span className={`flex items-center gap-1 px-1.5 py-0.5 rounded font-bold border ${proj.status === 'Deployed' ? 'bg-green-100 text-green-800 border-green-200' : 'bg-orange-50 text-orange-800 border-orange-200'}`}><Calendar size={10} /> {proj.deadline}</span>
-                                            </div>
-                                            <select className="w-full text-xs p-1.5 border border-gray-300 rounded bg-gray-50 text-gray-800 outline-none focus:border-[#373737] font-medium" value={proj.status} onChange={(e) => updateProjectStatus(proj.id, e.target.value as ProjectStatus)}>
-                                                {techColumns.map(s => <option key={s} value={s}>{s}</option>)}
-                                            </select>
-                                        </div>
-                                    ))}
+                                        ))}
+                                    </div>
                                 </div>
-                            </div>
-                        ))}
+                            );
+                        })}
                     </div>
                 </div>
             )}
