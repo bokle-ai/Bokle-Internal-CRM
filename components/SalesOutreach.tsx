@@ -1,10 +1,10 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { generateOutreachSequence, researchCompany } from '../services/geminiService';
+import { generateOutreachSequence, researchCompany, refineOutreachSequence } from '../services/geminiService';
 import { DataService } from '../services/storageService';
-import { IntegrationState, OutreachLead } from '../types';
-import { Loader2, Mail, Linkedin, Copy, Check, Upload, FileSpreadsheet, Send, Search, Sparkles, User, RefreshCw, X, Instagram } from 'lucide-react';
+import { IntegrationState, OutreachLead, Deal } from '../types';
+import { Loader2, Mail, Linkedin, Copy, Check, Upload, Send, Search, Sparkles, User, RefreshCw, X, MessageSquare, ArrowRight, Briefcase } from 'lucide-react';
 
 type Mode = 'generator' | 'manager';
 
@@ -35,6 +35,12 @@ const SalesOutreach: React.FC<SalesOutreachProps> = ({ integrations }) => {
     const [editingSequence, setEditingSequence] = useState(false);
     const [tempSequence, setTempSequence] = useState('');
 
+    // Chat / Refinement State
+    const [chatInput, setChatInput] = useState('');
+    const [chatHistory, setChatHistory] = useState<{role: 'user' | 'ai', text: string}[]>([]);
+    const [isRefining, setIsRefining] = useState(false);
+    const chatEndRef = useRef<HTMLDivElement>(null);
+
     // Shared: Email Modal
     const [showEmailModal, setShowEmailModal] = useState(false);
     const [emailDraft, setEmailDraft] = useState({ to: '', subject: '', body: '' });
@@ -43,6 +49,11 @@ const SalesOutreach: React.FC<SalesOutreachProps> = ({ integrations }) => {
     useEffect(() => {
         loadLeads();
     }, []);
+
+    // Scroll chat on update
+    useEffect(() => {
+        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [chatHistory, isRefining]);
 
     const loadLeads = async () => {
         setIsLoadingLeads(true);
@@ -66,13 +77,14 @@ const SalesOutreach: React.FC<SalesOutreachProps> = ({ integrations }) => {
             const companyIdx = headers.findIndex(h => h.includes('company') || h.includes('account'));
             const roleIdx = headers.findIndex(h => h.includes('title') || h.includes('role') || h.includes('position'));
             const emailIdx = headers.findIndex(h => h.includes('email'));
-            const webIdx = headers.findIndex(h => h.includes('web') || h.includes('url'));
+            const webIdx = headers.findIndex(h => h.includes('web') || h.includes('url') || h.includes('linkedin'));
 
             setIsImporting(true);
             
+            const newLeads: OutreachLead[] = [];
+            
             // Process rows
             for (let i = 1; i < lines.length; i++) {
-                // Handle quoted CSV strings
                 const values = lines[i].match(/(".*?"|[^",\s]+)(?=\s*,|\s*$)/g) || [];
                 const simpleValues = lines[i].split(',');
                 const vals = values.length > simpleValues.length ? values : simpleValues;
@@ -90,13 +102,22 @@ const SalesOutreach: React.FC<SalesOutreachProps> = ({ integrations }) => {
                         status: 'New',
                         createdAt: new Date().toISOString()
                     };
-                    await DataService.saveOutreachLead(newLead);
+                    newLeads.push(newLead);
                 }
             }
             
-            await loadLeads();
+            if (newLeads.length > 0) {
+                try {
+                    await DataService.saveOutreachLeadsBulk(newLeads);
+                    await loadLeads();
+                } catch (error) {
+                    console.error("CSV Import Error", error);
+                    alert("Import Failed: If using Supabase, please run the SQL setup query in Integrations tab.");
+                }
+            }
+            
             setIsImporting(false);
-            e.target.value = ''; // Reset input
+            e.target.value = '';
         };
         reader.readAsText(file);
     };
@@ -106,8 +127,8 @@ const SalesOutreach: React.FC<SalesOutreachProps> = ({ integrations }) => {
 
     const handleGenerateForLead = async (lead: OutreachLead) => {
         setIsProcessingAction(true);
+        setChatHistory([]); // Reset chat for new generation
         try {
-            // If we have a website, research it briefly first for context
             let pain = lead.painPoint;
             if (!pain && lead.website) {
                  const res = await researchCompany(lead.website);
@@ -127,12 +148,64 @@ const SalesOutreach: React.FC<SalesOutreachProps> = ({ integrations }) => {
             
             await DataService.saveOutreachLead(updatedLead);
             setLeads(prev => prev.map(l => l.id === lead.id ? updatedLead : l));
+            setChatHistory([{ role: 'ai', text: 'Sequence generated based on role & company.' }]);
         } catch (e) {
             console.error("Gen Error", e);
             alert("Failed to generate sequence");
         } finally {
             setIsProcessingAction(false);
         }
+    };
+
+    const handleRefine = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedLead || !chatInput.trim()) return;
+
+        setIsRefining(true);
+        setChatHistory(prev => [...prev, { role: 'user', text: chatInput }]);
+        const oldSequence = selectedLead.generatedSequence || '';
+
+        try {
+            const refined = await refineOutreachSequence(oldSequence, chatInput);
+            
+            // Update Lead
+            const updatedLead: OutreachLead = { ...selectedLead, generatedSequence: refined };
+            await DataService.saveOutreachLead(updatedLead);
+            setLeads(prev => prev.map(l => l.id === selectedLead.id ? updatedLead : l));
+            
+            setChatHistory(prev => [...prev, { role: 'ai', text: 'Sequence updated.' }]);
+            setChatInput('');
+        } catch (error) {
+            setChatHistory(prev => [...prev, { role: 'ai', text: 'Failed to refine sequence.' }]);
+        } finally {
+            setIsRefining(false);
+        }
+    };
+
+    const handleConvertToDeal = async () => {
+        if (!selectedLead) return;
+        if (!window.confirm(`Create a Deal for ${selectedLead.company} in the CRM?`)) return;
+
+        const newDeal: Deal = {
+            id: `deal_${Date.now()}`,
+            clientName: selectedLead.company,
+            value: '$0',
+            service: 'Pending',
+            status: 'Discovery', // Jump straight to Discovery
+            lastContact: 'Today',
+            notes: `Converted from Outreach Lead. Contact: ${selectedLead.name} (${selectedLead.role}). Pain: ${selectedLead.painPoint}`,
+            problemStatement: selectedLead.painPoint
+        };
+
+        await DataService.saveDeal(newDeal);
+        
+        // Update Lead status to indicate conversion (optional, strictly keeping 'Contacted' or adding 'Converted' later)
+        // For now, let's mark as Contacted so it shows green
+        const updatedLead: OutreachLead = { ...selectedLead, status: 'Contacted' };
+        await DataService.saveOutreachLead(updatedLead);
+        setLeads(prev => prev.map(l => l.id === selectedLead.id ? updatedLead : l));
+
+        alert("Deal created in CRM Pipeline!");
     };
 
     const handleSaveSequence = async () => {
@@ -148,6 +221,18 @@ const SalesOutreach: React.FC<SalesOutreachProps> = ({ integrations }) => {
             await DataService.deleteOutreachLead(id);
             if (selectedLeadId === id) setSelectedLeadId(null);
             setLeads(prev => prev.filter(l => l.id !== id));
+        }
+    };
+
+    const openLinkedIn = () => {
+        if (!selectedLead) return;
+        // Check if website looks like linkedin
+        if (selectedLead.website && selectedLead.website.includes('linkedin.com')) {
+            window.open(selectedLead.website, '_blank');
+        } else {
+            // Search by name and company
+            const query = encodeURIComponent(`${selectedLead.name} ${selectedLead.company} linkedin`);
+            window.open(`https://www.google.com/search?q=${query}`, '_blank');
         }
     };
 
@@ -250,6 +335,7 @@ const SalesOutreach: React.FC<SalesOutreachProps> = ({ integrations }) => {
                                         onClick={() => {
                                             setSelectedLeadId(lead.id);
                                             setEditingSequence(false);
+                                            setChatHistory([]);
                                         }}
                                         className={`w-full text-left p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors flex justify-between items-center group ${selectedLeadId === lead.id ? 'bg-blue-50/50 border-l-4 border-l-[#15621B]' : 'border-l-4 border-l-transparent'}`}
                                     >
@@ -275,8 +361,8 @@ const SalesOutreach: React.FC<SalesOutreachProps> = ({ integrations }) => {
                     <div className="flex-1 bg-white rounded-xl border border-gray-200 shadow-sm flex flex-col overflow-hidden">
                         {selectedLead ? (
                             <>
-                                {/* Lead Header */}
-                                <div className="p-6 border-b border-gray-100 bg-gray-50 flex justify-between items-start">
+                                {/* Lead Header & Actions */}
+                                <div className="p-6 border-b border-gray-100 bg-gray-50 flex justify-between items-start shrink-0">
                                     <div>
                                         <h3 className="text-xl font-bold text-gray-900">{selectedLead.name}</h3>
                                         <div className="text-gray-600 text-sm font-medium flex items-center gap-2 mt-1">
@@ -288,82 +374,140 @@ const SalesOutreach: React.FC<SalesOutreachProps> = ({ integrations }) => {
                                         </div>
                                     </div>
                                     <div className="flex gap-2">
-                                        {/* Status Actions */}
+                                        <button 
+                                            onClick={handleConvertToDeal}
+                                            className="bg-white border border-green-200 text-green-700 hover:bg-green-50 px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-colors shadow-sm"
+                                        >
+                                            <Briefcase size={14} /> Convert to Deal
+                                        </button>
                                         <button onClick={() => handleDeleteLead(selectedLead.id)} className="text-gray-400 hover:text-red-500 p-2"><X size={18} /></button>
                                     </div>
                                 </div>
 
-                                {/* Content Area */}
-                                <div className="flex-1 overflow-y-auto p-6">
+                                {/* Main Content Split: Sequence (Top) & Chat (Bottom) */}
+                                <div className="flex-1 flex flex-col overflow-hidden">
+                                    
                                     {selectedLead.status === 'New' && !selectedLead.generatedSequence ? (
-                                        <div className="h-full flex flex-col items-center justify-center text-center">
+                                         <div className="flex-1 flex flex-col items-center justify-center text-center p-8">
                                             <Sparkles className="text-[#15621B] mb-4 opacity-80" size={48} />
-                                            <h4 className="font-bold text-gray-800 text-lg mb-2">Ready to Glide?</h4>
-                                            <p className="text-gray-500 max-w-sm mb-6">Generate a personalized sequence for {selectedLead.name} based on their role and company.</p>
+                                            <h4 className="font-bold text-gray-800 text-lg mb-2">Generate Sequence</h4>
+                                            <p className="text-gray-500 max-w-sm mb-6">Create a personalized 4-step outreach plan for {selectedLead.name}.</p>
                                             <button 
                                                 onClick={() => handleGenerateForLead(selectedLead)}
                                                 disabled={isProcessingAction}
                                                 className="bg-[#15621B] text-white px-6 py-3 rounded-lg font-bold shadow-md hover:bg-[#0e4412] transition-colors disabled:opacity-50 flex items-center gap-2"
                                             >
                                                 {isProcessingAction ? <Loader2 className="animate-spin" /> : <RefreshCw size={18} />}
-                                                Generate Sequence
+                                                Generate
                                             </button>
                                         </div>
                                     ) : (
-                                        <div className="h-full flex flex-col">
-                                            <div className="flex justify-between items-center mb-4">
-                                                <h4 className="font-bold text-gray-700 text-sm uppercase">Outreach Sequence</h4>
-                                                <div className="flex gap-2">
-                                                    {!editingSequence ? (
-                                                        <button 
-                                                            onClick={() => {
-                                                                setTempSequence(selectedLead.generatedSequence || '');
-                                                                setEditingSequence(true);
-                                                            }}
-                                                            className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded font-medium"
-                                                        >
-                                                            Edit
+                                        <>
+                                            {/* Top: The Generated Sequence */}
+                                            <div className="flex-1 overflow-y-auto p-6 border-b border-gray-100">
+                                                <div className="flex justify-between items-center mb-4">
+                                                    <div className="flex items-center gap-2">
+                                                        <h4 className="font-bold text-gray-700 text-sm uppercase">Outreach Sequence</h4>
+                                                        {/* Smart Actions */}
+                                                        <button onClick={openLinkedIn} className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded border border-blue-100 hover:bg-blue-100 flex items-center gap-1 ml-4" title="Open LinkedIn Profile">
+                                                            <Linkedin size={12} /> Open LinkedIn
                                                         </button>
-                                                    ) : (
+                                                    </div>
+                                                    
+                                                    <div className="flex gap-2">
+                                                        {!editingSequence ? (
+                                                            <button 
+                                                                onClick={() => {
+                                                                    setTempSequence(selectedLead.generatedSequence || '');
+                                                                    setEditingSequence(true);
+                                                                }}
+                                                                className="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 px-3 py-1.5 rounded font-medium"
+                                                            >
+                                                                Manual Edit
+                                                            </button>
+                                                        ) : (
+                                                            <button 
+                                                                onClick={handleSaveSequence}
+                                                                className="text-xs bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded font-bold"
+                                                            >
+                                                                Save
+                                                            </button>
+                                                        )}
                                                         <button 
-                                                            onClick={handleSaveSequence}
-                                                            className="text-xs bg-green-600 hover:bg-green-700 text-white px-3 py-1.5 rounded font-bold"
+                                                            onClick={() => navigator.clipboard.writeText(selectedLead.generatedSequence || '')}
+                                                            className="p-1.5 text-gray-400 hover:text-gray-600"
+                                                            title="Copy"
                                                         >
-                                                            Save
+                                                            <Copy size={16} />
+                                                        </button>
+                                                    </div>
+                                                </div>
+
+                                                {editingSequence ? (
+                                                    <textarea 
+                                                        className="w-full h-64 p-4 border border-gray-300 rounded-lg outline-none focus:border-[#15621B] resize-none font-mono text-sm"
+                                                        value={tempSequence}
+                                                        onChange={e => setTempSequence(e.target.value)}
+                                                    />
+                                                ) : (
+                                                    <div className="prose prose-sm max-w-none text-gray-800 bg-white">
+                                                        <ReactMarkdown>{selectedLead.generatedSequence || ''}</ReactMarkdown>
+                                                    </div>
+                                                )}
+                                                
+                                                {/* Action Bar */}
+                                                <div className="mt-6 flex justify-end gap-3">
+                                                    {integrations?.gmail && (
+                                                        <button 
+                                                            onClick={() => initiateEmail(selectedLead.generatedSequence || '', selectedLead.email)}
+                                                            className="px-4 py-2 bg-[#15621B] text-white rounded-lg hover:bg-[#0e4412] font-bold text-sm flex items-center gap-2 shadow-sm"
+                                                        >
+                                                            <Mail size={16} /> Send Email
                                                         </button>
                                                     )}
                                                 </div>
                                             </div>
 
-                                            {editingSequence ? (
-                                                <textarea 
-                                                    className="flex-1 w-full p-4 border border-gray-300 rounded-lg outline-none focus:border-[#15621B] resize-none font-mono text-sm"
-                                                    value={tempSequence}
-                                                    onChange={e => setTempSequence(e.target.value)}
-                                                />
-                                            ) : (
-                                                <div className="prose prose-sm max-w-none text-gray-800 bg-white flex-1 overflow-y-auto pr-2">
-                                                    <ReactMarkdown>{selectedLead.generatedSequence || ''}</ReactMarkdown>
+                                            {/* Bottom: Refinement Chat */}
+                                            <div className="h-48 bg-gray-50 flex flex-col shrink-0">
+                                                <div className="px-4 py-2 border-b border-gray-200 flex items-center justify-between">
+                                                    <span className="text-xs font-bold text-gray-500 uppercase flex items-center gap-2">
+                                                        <MessageSquare size={14} /> AI Refinement
+                                                    </span>
                                                 </div>
-                                            )}
-
-                                            <div className="mt-6 pt-4 border-t border-gray-100 flex justify-end gap-3">
-                                                 <button 
-                                                    onClick={() => navigator.clipboard.writeText(selectedLead.generatedSequence || '')}
-                                                    className="px-4 py-2 bg-white border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 font-medium text-sm flex items-center gap-2"
-                                                >
-                                                    <Copy size={16} /> Copy
-                                                </button>
-                                                {integrations?.gmail && (
-                                                    <button 
-                                                        onClick={() => initiateEmail(selectedLead.generatedSequence || '', selectedLead.email)}
-                                                        className="px-4 py-2 bg-[#15621B] text-white rounded-lg hover:bg-[#0e4412] font-bold text-sm flex items-center gap-2 shadow-sm"
-                                                    >
-                                                        <Mail size={16} /> Send Email
-                                                    </button>
-                                                )}
+                                                <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                                                    {chatHistory.map((msg, idx) => (
+                                                        <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                                            <div className={`
+                                                                max-w-[85%] px-3 py-2 rounded-lg text-xs
+                                                                ${msg.role === 'user' ? 'bg-[#15621B] text-white' : 'bg-white border border-gray-200 text-gray-700'}
+                                                            `}>
+                                                                {msg.text}
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                    <div ref={chatEndRef} />
+                                                </div>
+                                                <div className="p-3 bg-white border-t border-gray-200">
+                                                    <form onSubmit={handleRefine} className="relative">
+                                                        <input 
+                                                            className="w-full pl-3 pr-10 py-2 border border-gray-300 rounded-md text-sm outline-none focus:border-[#15621B] bg-gray-50 focus:bg-white transition-colors"
+                                                            placeholder="e.g. 'Make it shorter' or 'Translate to Spanish'"
+                                                            value={chatInput}
+                                                            onChange={e => setChatInput(e.target.value)}
+                                                            disabled={isRefining}
+                                                        />
+                                                        <button 
+                                                            type="submit"
+                                                            disabled={!chatInput.trim() || isRefining}
+                                                            className="absolute right-2 top-2 text-[#15621B] hover:text-[#0e4412] disabled:opacity-30"
+                                                        >
+                                                            {isRefining ? <Loader2 size={16} className="animate-spin" /> : <ArrowRight size={16} />}
+                                                        </button>
+                                                    </form>
+                                                </div>
                                             </div>
-                                        </div>
+                                        </>
                                     )}
                                 </div>
                             </>
@@ -376,7 +520,7 @@ const SalesOutreach: React.FC<SalesOutreachProps> = ({ integrations }) => {
                     </div>
                 </div>
             ) : (
-                // MODE: GENERATOR (Simplified from previous version)
+                // MODE: GENERATOR (Simplified)
                 <div className="flex-1 bg-white p-6 rounded-xl border border-gray-200 shadow-sm overflow-hidden flex flex-col md:flex-row gap-6">
                     <div className="w-full md:w-1/3 space-y-4">
                         <h3 className="font-bold text-lg text-[#15621B]">Quick Generator</h3>

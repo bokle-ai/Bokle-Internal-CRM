@@ -155,6 +155,42 @@ export const generateOutreachSequence = async (
     }
 };
 
+export const refineOutreachSequence = async (
+    currentContent: string,
+    instruction: string
+): Promise<string> => {
+    try {
+        const ai = getAiClient();
+        const prompt = `
+        TASK: Rewrite the following Outreach Sequence based on the user's specific instructions.
+        
+        CURRENT CONTENT:
+        ${currentContent}
+
+        USER INSTRUCTIONS:
+        "${instruction}"
+
+        REQUIREMENTS:
+        1. Keep the 4-step structure (LinkedIn Note, Email 1, etc) unless asked to change it.
+        2. Only modify what is requested.
+        3. Maintain Bokle AI's founder-friendly tone.
+        4. Return the FULL updated content.
+        `;
+
+        const response = await ai.models.generateContent({
+            model: "gemini-2.5-flash",
+            contents: prompt,
+            config: {
+                systemInstruction: `You are an expert copywriter for Bokle AI. \n${BOKLE_CONTEXT}`,
+                temperature: 0.7,
+            },
+        });
+        return response.text || "No response generated.";
+    } catch (error: any) {
+        return handleAiError(error, "Refine Sequence");
+    }
+};
+
 export const analyzeProspectList = async (
     csvData: string
 ): Promise<string> => {

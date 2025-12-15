@@ -97,10 +97,11 @@ const Integrations: React.FC<IntegrationsProps> = ({ integrations, setIntegratio
     };
 
     const setupSQL = `
--- Run this in Supabase SQL Editor to create your tables
+-- Run this in Supabase SQL Editor to create your tables.
+-- This script is "Idempotent" - it is safe to run multiple times.
 
--- 1. DEALS TABLE
-create table public.deals (
+-- 1. DEALS TABLE (Sales CRM)
+create table if not exists public.deals (
   "id" text primary key,
   "clientName" text,
   "value" text,
@@ -113,8 +114,8 @@ create table public.deals (
   "created_at" timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
--- 2. PROJECTS TABLE
-create table public.projects (
+-- 2. PROJECTS TABLE (Tech Handover)
+create table if not exists public.projects (
   "id" text primary key,
   "clientName" text,
   "featureSummary" text,
@@ -123,8 +124,8 @@ create table public.projects (
   "created_at" timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
--- 3. MARKETING TABLE
-create table public.marketing_tasks (
+-- 3. MARKETING TABLE (Content Calendar)
+create table if not exists public.marketing_tasks (
   "id" text primary key,
   "title" text,
   "contentType" text,
@@ -134,8 +135,8 @@ create table public.marketing_tasks (
   "created_at" timestamp with time zone default timezone('utc'::text, now()) not null
 );
 
--- 4. ARTIFACTS TABLE (For Saved Documents)
-create table public.deal_artifacts (
+-- 4. ARTIFACTS TABLE (Saved Documents)
+create table if not exists public.deal_artifacts (
   "id" text primary key,
   "dealId" text,
   "stage" text,
@@ -146,7 +147,7 @@ create table public.deal_artifacts (
 );
 
 -- 5. OUTREACH LEADS TABLE (For Bulk Import & Sequences)
-create table public.outreach_leads (
+create table if not exists public.outreach_leads (
   "id" text primary key,
   "name" text,
   "company" text,
@@ -168,12 +169,29 @@ alter table public.deal_artifacts enable row level security;
 alter table public.outreach_leads enable row level security;
 
 -- 7. ALLOW PUBLIC ACCESS (For this internal tool)
--- Note: In a real production app with multiple users, you would restrict this.
-create policy "Enable all access" on public.deals for all using (true) with check (true);
-create policy "Enable all access" on public.projects for all using (true) with check (true);
-create policy "Enable all access" on public.marketing_tasks for all using (true) with check (true);
-create policy "Enable all access" on public.deal_artifacts for all using (true) with check (true);
-create policy "Enable all access" on public.outreach_leads for all using (true) with check (true);
+do $$
+begin
+  if not exists (select 1 from pg_policies where policyname = 'Enable all access' and tablename = 'deals') then
+    create policy "Enable all access" on public.deals for all using (true) with check (true);
+  end if;
+  
+  if not exists (select 1 from pg_policies where policyname = 'Enable all access' and tablename = 'projects') then
+    create policy "Enable all access" on public.projects for all using (true) with check (true);
+  end if;
+
+  if not exists (select 1 from pg_policies where policyname = 'Enable all access' and tablename = 'marketing_tasks') then
+    create policy "Enable all access" on public.marketing_tasks for all using (true) with check (true);
+  end if;
+
+  if not exists (select 1 from pg_policies where policyname = 'Enable all access' and tablename = 'deal_artifacts') then
+    create policy "Enable all access" on public.deal_artifacts for all using (true) with check (true);
+  end if;
+  
+  if not exists (select 1 from pg_policies where policyname = 'Enable all access' and tablename = 'outreach_leads') then
+    create policy "Enable all access" on public.outreach_leads for all using (true) with check (true);
+  end if;
+end
+$$;
     `.trim();
 
     return (

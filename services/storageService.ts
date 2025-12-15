@@ -231,6 +231,27 @@ export const DataService = {
         }
     },
 
+    saveOutreachLeadsBulk: async (leads: OutreachLead[]) => {
+        const sb = getSupabase();
+        if (sb) {
+            const { error } = await sb.from('outreach_leads').upsert(leads);
+            if (error) {
+                console.error("Supabase Bulk Save Error:", error);
+                throw error; // Throw to caller to handle
+            }
+        } else {
+            const current = parseLocal<OutreachLead[]>(KEYS.LEADS, []);
+            // Merge arrays (inefficient but okay for local storage scale)
+            const newLeads = [...current];
+            leads.forEach(lead => {
+                const index = newLeads.findIndex(l => l.id === lead.id);
+                if (index >= 0) newLeads[index] = lead;
+                else newLeads.push(lead);
+            });
+            localStorage.setItem(KEYS.LEADS, JSON.stringify(newLeads));
+        }
+    },
+
     deleteOutreachLead: async (id: string) => {
         const sb = getSupabase();
         if (sb) {
