@@ -1,79 +1,25 @@
-
 import { GoogleGenAI } from "@google/genai";
 import { BOKLE_CONTEXT } from "../constants";
 
-const LOCAL_STORAGE_KEY = 'bokle_ai_api_key';
-
-export const saveApiKey = (key: string) => {
-    if (key.trim()) {
-        localStorage.setItem(LOCAL_STORAGE_KEY, key.trim());
-        // Force a reload to ensure all components pick up the new state if needed, 
-        // though strictly not necessary if we check on every call. 
-        // We will handle UI updates in the component.
-    }
-};
-
-export const removeApiKey = () => {
-    localStorage.removeItem(LOCAL_STORAGE_KEY);
-};
-
-export const getStoredApiKey = () => {
-    return localStorage.getItem(LOCAL_STORAGE_KEY);
-};
-
-// Helper to check if configuration is present without making a request
+// Helper to check if configuration is present
 export const checkConfiguration = (): boolean => {
-    const envKey = process.env.AI_API_KEY;
-    const localKey = getStoredApiKey();
-    
-    const hasEnvKey = !!(envKey && envKey !== "undefined" && envKey !== "");
-    const hasLocalKey = !!(localKey && localKey !== "");
-
-    return hasEnvKey || hasLocalKey;
+    return !!process.env.API_KEY;
 };
 
+// Internal helper to get AI client initialized with API_KEY from process.env
 const getAiClient = () => {
-    // Priority: 1. Environment Variable, 2. Local Storage
-    const envKey = process.env.AI_API_KEY;
-    const localKey = getStoredApiKey();
-    
-    // Check Env Key validity
-    if (envKey && envKey !== "undefined" && envKey !== "") {
-        return new GoogleGenAI({ apiKey: envKey });
+    if (!process.env.API_KEY) {
+        throw new Error("MISSING_API_KEY");
     }
-
-    // Check Local Key validity
-    if (localKey && localKey !== "") {
-        return new GoogleGenAI({ apiKey: localKey });
-    }
-    
-    throw new Error("MISSING_API_KEY");
+    return new GoogleGenAI({ apiKey: process.env.API_KEY });
 };
 
 const handleAiError = (error: any, context: string): string => {
     console.error(`Gemini API Error (${context}):`, error);
-    
-    // Catch specific error strings that might come from the SDK or our check
-    if (
-        error.message === "MISSING_API_KEY" || 
-        error.message?.includes("API_KEY") || 
-        error.message?.includes("API key") ||
-        error.toString().includes("API_KEY")
-    ) {
-        return `
-### ⚠️ Configuration Required
-
-The **AI_API_KEY** is missing.
-
-**How to fix:**
-1. [Click here to get a free API Key from Google](https://aistudio.google.com/app/apikey)
-2. Enter it in the Dashboard or Integrations tab.
-        `.trim();
-    }
-
     return `Unable to generate content. Error: ${error.message || "Unknown error occurred."}`;
 };
 
+// Basic Text Task: 'gemini-3-flash-preview'
 export const generateSalesScript = async (
     clientType: string,
     problem: string,
@@ -98,7 +44,7 @@ export const generateSalesScript = async (
         `;
 
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-3-flash-preview",
             contents: prompt,
             config: {
                 systemInstruction: `You are a strategic sales assistant for Bokle AI. \n${BOKLE_CONTEXT}`,
@@ -111,6 +57,7 @@ export const generateSalesScript = async (
     }
 };
 
+// Basic Text Task: 'gemini-3-flash-preview'
 export const generateOutreachSequence = async (
     prospectName: string,
     role: string,
@@ -153,7 +100,7 @@ export const generateOutreachSequence = async (
         `;
 
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-3-flash-preview",
             contents: prompt,
             config: {
                 systemInstruction: `You are a strategic sales assistant for Bokle AI. \n${BOKLE_CONTEXT}`,
@@ -166,6 +113,7 @@ export const generateOutreachSequence = async (
     }
 };
 
+// Basic Text Task: 'gemini-3-flash-preview'
 export const refineOutreachSequence = async (
     currentContent: string,
     instruction: string
@@ -189,7 +137,7 @@ export const refineOutreachSequence = async (
         `;
 
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-3-flash-preview",
             contents: prompt,
             config: {
                 systemInstruction: `You are an expert copywriter for Bokle AI. \n${BOKLE_CONTEXT}`,
@@ -202,6 +150,7 @@ export const refineOutreachSequence = async (
     }
 };
 
+// Complex Text Task: 'gemini-3-pro-preview'
 export const analyzeProspectList = async (
     csvData: string
 ): Promise<string> => {
@@ -221,7 +170,7 @@ export const analyzeProspectList = async (
         `;
 
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-3-pro-preview",
             contents: prompt,
             config: {
                 systemInstruction: `You are a strategic sales director for Bokle AI. \n${BOKLE_CONTEXT}`,
@@ -234,6 +183,7 @@ export const analyzeProspectList = async (
     }
 };
 
+// Basic Text Task with Google Search: 'gemini-3-flash-preview'
 export const researchCompany = async (url: string): Promise<{ company: string, painPoint: string }> => {
     try {
         const ai = getAiClient();
@@ -256,7 +206,7 @@ export const researchCompany = async (url: string): Promise<{ company: string, p
         `;
 
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-3-flash-preview",
             contents: prompt,
             config: {
                 tools: [{googleSearch: {}}],
@@ -285,6 +235,7 @@ export const researchCompany = async (url: string): Promise<{ company: string, p
     }
 };
 
+// Basic Text Task: 'gemini-3-flash-preview'
 export const explainService = async (
     serviceName: string,
     clientContext: string
@@ -303,7 +254,7 @@ export const explainService = async (
         `;
 
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-3-flash-preview",
             contents: prompt,
             config: {
                 systemInstruction: `You are a strategic sales assistant for Bokle AI. \n${BOKLE_CONTEXT}`,
@@ -316,6 +267,7 @@ export const explainService = async (
     }
 };
 
+// Complex Text Task: 'gemini-3-pro-preview'
 export const generateHandover = async (
     clientName: string,
     agreedScope: string,
@@ -339,7 +291,7 @@ export const generateHandover = async (
         `;
 
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-3-pro-preview",
             contents: prompt,
             config: {
                 systemInstruction: `You are a technical product manager for Bokle AI. \n${BOKLE_CONTEXT}`,
@@ -352,6 +304,7 @@ export const generateHandover = async (
     }
 };
 
+// Complex Text Task: 'gemini-3-pro-preview'
 export const generateDocument = async (
     docType: 'Proposal' | 'ScopeOfWork' | 'Email',
     details: string
@@ -372,7 +325,7 @@ export const generateDocument = async (
         `;
 
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-3-pro-preview",
             contents: prompt,
             config: {
                 systemInstruction: `You are an operations assistant for Bokle AI. \n${BOKLE_CONTEXT}`,
@@ -386,6 +339,7 @@ export const generateDocument = async (
     }
 };
 
+// Complex Text Task: 'gemini-3-pro-preview'
 export const generateStageArtifact = async (
     stage: string,
     artifactType: string,
@@ -410,7 +364,7 @@ export const generateStageArtifact = async (
         `;
 
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-3-pro-preview",
             contents: prompt,
             config: {
                 systemInstruction: `You are a Delivery Manager for Bokle AI. \n${BOKLE_CONTEXT}`,
@@ -424,6 +378,7 @@ export const generateStageArtifact = async (
     }
 };
 
+// Basic Text Task: 'gemini-3-flash-preview'
 export const refineArtifactContent = async (
     currentContent: string,
     instructions: string,
@@ -448,7 +403,7 @@ export const refineArtifactContent = async (
         `;
 
         const response = await ai.models.generateContent({
-            model: "gemini-2.5-flash",
+            model: "gemini-3-flash-preview",
             contents: prompt,
             config: {
                 systemInstruction: `You are an expert editor for Bokle AI. \n${BOKLE_CONTEXT}`,
@@ -460,3 +415,8 @@ export const refineArtifactContent = async (
         return handleAiError(error, "Refine Artifact");
     }
 }
+
+// Deprecated local storage key management removed per guidelines
+export const saveApiKey = (key: string) => {};
+export const removeApiKey = () => {};
+export const getStoredApiKey = () => null;

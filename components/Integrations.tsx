@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { Mail, Linkedin, CheckCircle2, AlertCircle, Key, Trash2, Database, Download, RefreshCw, Cloud, Instagram, Workflow, Image, Upload } from 'lucide-react';
 import { IntegrationState } from '../types';
-import { getStoredApiKey, removeApiKey, saveApiKey, checkConfiguration } from '../services/geminiService';
+import { checkConfiguration } from '../services/geminiService';
 import { DataService, getSupabaseConfig, saveSupabaseConfig, clearSupabaseConfig } from '../services/storageService';
 
 interface IntegrationsProps {
@@ -13,9 +13,7 @@ interface IntegrationsProps {
 const Integrations: React.FC<IntegrationsProps> = ({ integrations, setIntegrations }) => {
     
     // API Key State
-    const [storedKey, setStoredKey] = useState<string | null>(null);
-    const [newKey, setNewKey] = useState('');
-    const [isEnvKeyPresent, setIsEnvKeyPresent] = useState(false);
+    const [isConfigured, setIsConfigured] = useState(false);
 
     // Supabase State
     const [sbUrl, setSbUrl] = useState('');
@@ -27,12 +25,7 @@ const Integrations: React.FC<IntegrationsProps> = ({ integrations, setIntegratio
     const [customLogo, setCustomLogo] = useState<string | null>(null);
 
     useEffect(() => {
-        setStoredKey(getStoredApiKey());
-        const isConfigured = checkConfiguration();
-        const local = getStoredApiKey();
-        if (isConfigured && !local) {
-            setIsEnvKeyPresent(true);
-        }
+        setIsConfigured(checkConfiguration());
 
         // Check Supabase
         const sbConf = getSupabaseConfig();
@@ -51,19 +44,6 @@ const Integrations: React.FC<IntegrationsProps> = ({ integrations, setIntegratio
 
     const toggleIntegration = (platform: 'gmail' | 'linkedin' | 'instagram') => {
         setIntegrations(prev => ({ ...prev, [platform]: !prev[platform] }));
-    };
-
-    const handleSaveKey = () => {
-        if (!newKey.trim()) return;
-        saveApiKey(newKey);
-        setStoredKey(newKey);
-        setNewKey('');
-    };
-
-    const handleRemoveKey = () => {
-        removeApiKey();
-        setStoredKey(null);
-        if (checkConfiguration()) setIsEnvKeyPresent(true); else setIsEnvKeyPresent(false);
     };
 
     const handleSaveSupabase = () => {
@@ -186,6 +166,7 @@ create table if not exists public.outreach_leads (
   "status" text,
   "painPoint" text,
   "generatedSequence" text,
+  "lastContact" text,
   "createdAt" text,
   "created_at" timestamp with time zone default timezone('utc'::text, now()) not null
 );
@@ -407,55 +388,25 @@ $$;
                 </div>
             </div>
 
-            {/* API Key Management Section */}
+            {/* API Status Info */}
             <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
                 <div className="flex items-start gap-4">
                     <div className="w-12 h-12 bg-purple-50 text-purple-700 rounded-lg flex items-center justify-center shrink-0">
                         <Key size={24} />
                     </div>
                     <div className="flex-1">
-                        <h3 className="text-lg font-bold text-gray-900">Gemini API Key</h3>
+                        <h3 className="text-lg font-bold text-gray-900">Gemini AI Engine</h3>
                         <p className="text-gray-700 text-sm mb-4 font-medium">
-                            Required for AI features.
+                            {isConfigured 
+                                ? "AI features are active using the pre-configured API_KEY."
+                                : "The API_KEY is missing from the environment. AI features will not function."}
                         </p>
-
-                        <div className="flex flex-col gap-3">
-                            {isEnvKeyPresent && (
-                                <div className="flex items-center gap-2 text-sm text-green-800 font-bold bg-green-50 px-3 py-2 rounded-md border border-green-200 w-fit">
-                                    <CheckCircle2 size={16} />
-                                    <span>Active via Environment Variable</span>
-                                </div>
-                            )}
-
-                            {storedKey ? (
-                                <div className="flex items-center gap-4 bg-gray-50 p-3 rounded-md border border-gray-200">
-                                    <div className="flex-1">
-                                        <div className="text-xs text-gray-600 uppercase font-bold">Stored in Browser</div>
-                                        <div className="font-mono text-sm text-gray-900 font-medium">
-                                            {storedKey.substring(0, 8)}...{storedKey.substring(storedKey.length - 4)}
-                                        </div>
-                                    </div>
-                                    <button onClick={handleRemoveKey} className="text-red-600 hover:text-red-800 p-2"><Trash2 size={18} /></button>
-                                </div>
-                            ) : !isEnvKeyPresent && (
-                                <div className="flex gap-2">
-                                    <input 
-                                        type="password"
-                                        placeholder="Paste API Key (AIza...)"
-                                        className="flex-1 p-2.5 border border-gray-300 rounded-md outline-none text-sm text-gray-900"
-                                        value={newKey}
-                                        onChange={(e) => setNewKey(e.target.value)}
-                                    />
-                                    <button 
-                                        onClick={handleSaveKey}
-                                        disabled={!newKey}
-                                        className="bg-purple-700 hover:bg-purple-800 text-white px-4 py-2 rounded-md text-sm font-bold"
-                                    >
-                                        Save
-                                    </button>
-                                </div>
-                            )}
-                        </div>
+                        {isConfigured && (
+                            <div className="flex items-center gap-2 text-sm text-green-800 font-bold bg-green-50 px-3 py-2 rounded-md border border-green-200 w-fit">
+                                <CheckCircle2 size={16} />
+                                <span>Engine Active</span>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>

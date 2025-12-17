@@ -1,7 +1,6 @@
-
 import React, { useEffect, useState } from 'react';
 import { PhoneCall, Code2, CheckCircle2, Users, AlertTriangle, ExternalLink, Key, Check, Cloud, Database } from 'lucide-react';
-import { checkConfiguration, saveApiKey } from '../services/geminiService';
+import { checkConfiguration } from '../services/geminiService';
 import { DataService } from '../services/storageService';
 import BrandLogo from './BrandLogo';
 
@@ -11,26 +10,12 @@ interface DashboardProps {
 
 const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
     const [isConfigured, setIsConfigured] = useState(true);
-    const [manualKey, setManualKey] = useState('');
-    const [isSaving, setIsSaving] = useState(false);
     const [isCloudActive, setIsCloudActive] = useState(false);
 
     useEffect(() => {
         setIsConfigured(checkConfiguration());
         setIsCloudActive(DataService.isCloudEnabled());
     }, []);
-
-    const handleSaveKey = () => {
-        if (!manualKey.trim()) return;
-        setIsSaving(true);
-        saveApiKey(manualKey);
-        
-        setTimeout(() => {
-            setIsConfigured(checkConfiguration());
-            setIsSaving(false);
-            setManualKey('');
-        }, 500);
-    };
 
     return (
         <div className="space-y-8 animate-in fade-in duration-500">
@@ -76,43 +61,9 @@ const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
                             <AlertTriangle className="text-red-500 mt-0.5 mr-3 shrink-0" size={20} />
                             <div className="w-full">
                                 <h3 className="font-bold text-red-800">Gemini AI Key Missing</h3>
-                                <p className="text-red-700 text-sm mt-1 mb-3">
-                                    You need a Google Gemini API Key for the AI features to work.
+                                <p className="text-red-700 text-sm mt-1">
+                                    The application requires a pre-configured API_KEY in the environment to function. Please ensure it is correctly set.
                                 </p>
-                                
-                                <div className="flex flex-col gap-4">
-                                    <a 
-                                        href="https://aistudio.google.com/app/apikey" 
-                                        target="_blank" 
-                                        rel="noreferrer"
-                                        className="text-red-700 text-sm font-semibold hover:underline flex items-center gap-1 w-fit"
-                                    >
-                                        Step 1: Get a free key from Google AI Studio <ExternalLink size={12} />
-                                    </a>
-
-                                    <div className="flex flex-col sm:flex-row gap-2 max-w-lg">
-                                        <div className="relative flex-1">
-                                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                                <Key size={14} className="text-red-400" />
-                                            </div>
-                                            <input 
-                                                type="password"
-                                                placeholder="Paste your key here (AIza...)"
-                                                className="w-full pl-9 pr-3 py-2 border border-red-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none text-sm shadow-sm"
-                                                value={manualKey}
-                                                onChange={(e) => setManualKey(e.target.value)}
-                                            />
-                                        </div>
-                                        <button 
-                                            onClick={handleSaveKey}
-                                            disabled={!manualKey || isSaving}
-                                            className="bg-red-600 hover:bg-red-700 text-white px-4 py-2 rounded-lg text-sm font-bold transition-colors disabled:opacity-50 flex items-center justify-center gap-2 shadow-sm"
-                                        >
-                                            {isSaving ? 'Saving...' : 'Save & Enable'}
-                                            {!isSaving && <Check size={16} />}
-                                        </button>
-                                    </div>
-                                </div>
                             </div>
                         </div>
                     </div>

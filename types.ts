@@ -77,6 +77,7 @@ export interface OutreachLead {
     painPoint?: string; // Inferred or Manual
     generatedSequence?: string;
     createdAt: string;
+    lastContact?: string;
 }
 
 export interface IntegrationState {
