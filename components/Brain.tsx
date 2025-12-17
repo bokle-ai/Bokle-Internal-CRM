@@ -6,7 +6,7 @@ import { queryCompanyBrain } from '../services/geminiService';
 import { 
     Brain as BrainIcon, Send, Sparkles, Loader2, Database, 
     RefreshCw, MessageSquare, Zap, Activity, Users, 
-    Code, Megaphone, Target
+    Code, Megaphone, Target, AlertCircle
 } from 'lucide-react';
 
 const SUGGESTED_QUERIES = [
@@ -110,10 +110,12 @@ const Brain: React.FC = () => {
                     return newMessages;
                 });
             }
-        } catch (error) {
+        } catch (error: any) {
+            console.error("Chat Error:", error);
             setMessages(prev => {
                 const newMessages = [...prev];
-                newMessages[newMessages.length - 1].text = "Error connecting to the Brain. Please check your API key.";
+                const errorMessage = error.message || "Unknown API error.";
+                newMessages[newMessages.length - 1].text = `### ⚠️ Connection Error\n\n${errorMessage}\n\n*Verify that your API_KEY is correctly set in your environment variables.*`;
                 return newMessages;
             });
         } finally {
@@ -165,7 +167,7 @@ const Brain: React.FC = () => {
             </div>
 
             {/* Main Chat Interface */}
-            <div className="flex-1 bg-white rounded-3xl border border-gray-200 shadow-sm flex flex-col overflow-hidden relative">
+            <div className="flex-1 bg-white rounded-3xl border border-gray-200 shadow-sm flex flex-col overflow-hidden relative border-t-4 border-t-indigo-500">
                 {/* Knowledge Base Status Pulse */}
                 <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10">
                     <div className="flex items-center gap-2 bg-white/80 backdrop-blur-md px-3 py-1 rounded-full border border-gray-100 shadow-sm">
@@ -175,7 +177,7 @@ const Brain: React.FC = () => {
                 </div>
 
                 {/* Messages Area */}
-                <div className="flex-1 overflow-y-auto p-6 md:p-10 space-y-6 custom-scrollbar">
+                <div className="flex-1 overflow-y-auto p-6 md:p-10 space-y-6 custom-scrollbar bg-gray-50/30">
                     {messages.length === 0 ? (
                         <div className="h-full flex flex-col items-center justify-center text-center max-w-xl mx-auto space-y-8 py-20">
                             <div className="w-24 h-24 bg-indigo-50 text-indigo-700 rounded-3xl flex items-center justify-center shadow-inner">
@@ -191,7 +193,7 @@ const Brain: React.FC = () => {
                                     <button 
                                         key={q} 
                                         onClick={() => handleSend(q)}
-                                        className="text-left p-4 bg-gray-50 hover:bg-indigo-50 hover:border-indigo-200 border border-gray-200 rounded-2xl text-xs font-bold text-gray-700 transition-all hover:shadow-md"
+                                        className="text-left p-4 bg-white hover:bg-indigo-50 hover:border-indigo-200 border border-gray-200 rounded-2xl text-xs font-bold text-gray-700 transition-all hover:shadow-md"
                                     >
                                         {q}
                                     </button>
@@ -202,7 +204,7 @@ const Brain: React.FC = () => {
                         messages.map((msg, idx) => (
                             <div key={idx} className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
                                 <div className={`flex gap-4 max-w-[85%] ${msg.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${msg.role === 'user' ? 'bg-[#15621B] text-white' : 'bg-indigo-100 text-indigo-700'}`}>
+                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${msg.role === 'user' ? 'bg-[#15621B] text-white shadow-md' : 'bg-white text-indigo-700 border border-indigo-100 shadow-sm'}`}>
                                         {msg.role === 'user' ? <Zap size={16} /> : <BrainIcon size={16} />}
                                     </div>
                                     <div className={`
@@ -223,13 +225,13 @@ const Brain: React.FC = () => {
                 </div>
 
                 {/* Input Section */}
-                <div className="p-6 border-t border-gray-100 bg-gray-50/50">
+                <div className="p-6 border-t border-gray-100 bg-white">
                     <form 
                         onSubmit={(e) => { e.preventDefault(); handleSend(); }}
                         className="max-w-4xl mx-auto relative group"
                     >
                         <textarea 
-                            className="w-full pl-6 pr-14 py-4 border border-gray-300 rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 bg-white transition-all shadow-lg text-sm resize-none h-16 custom-scrollbar"
+                            className="w-full pl-6 pr-14 py-4 border border-gray-300 rounded-2xl outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 bg-gray-50/50 hover:bg-white transition-all shadow-lg text-sm resize-none h-16 custom-scrollbar"
                             placeholder="Ask the Brain anything..."
                             value={input}
                             onChange={(e) => setInput(e.target.value)}
@@ -251,7 +253,7 @@ const Brain: React.FC = () => {
                     </form>
                     <div className="mt-3 text-center">
                         <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest flex items-center justify-center gap-1.5">
-                            <Sparkles size={10} /> Powered by Gemini 3 Pro reasoning over your entire database
+                            <Sparkles size={10} /> Powered by Gemini 3 Flash (Free Tier Optimized)
                         </p>
                     </div>
                 </div>

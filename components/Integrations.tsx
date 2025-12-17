@@ -2,7 +2,6 @@
 import React, { useEffect, useState } from 'react';
 import { Mail, Linkedin, CheckCircle2, AlertCircle, Key, Trash2, Database, Download, RefreshCw, Cloud, Instagram, Workflow, Image, Upload } from 'lucide-react';
 import { IntegrationState } from '../types';
-import { checkConfiguration } from '../services/geminiService';
 import { DataService, getSupabaseConfig, saveSupabaseConfig, clearSupabaseConfig } from '../services/storageService';
 
 interface IntegrationsProps {
@@ -12,9 +11,6 @@ interface IntegrationsProps {
 
 const Integrations: React.FC<IntegrationsProps> = ({ integrations, setIntegrations }) => {
     
-    // API Key State
-    const [isConfigured, setIsConfigured] = useState(false);
-
     // Supabase State
     const [sbUrl, setSbUrl] = useState('');
     const [sbKey, setSbKey] = useState('');
@@ -25,8 +21,6 @@ const Integrations: React.FC<IntegrationsProps> = ({ integrations, setIntegratio
     const [customLogo, setCustomLogo] = useState<string | null>(null);
 
     useEffect(() => {
-        setIsConfigured(checkConfiguration());
-
         // Check Supabase
         const sbConf = getSupabaseConfig();
         if (sbConf.url && sbConf.key) {
@@ -382,29 +376,6 @@ $$;
                                     Copy
                                 </button>
                                 <pre className="text-xs text-green-400 font-mono font-medium">{setupSQL}</pre>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            </div>
-
-            {/* API Status Info */}
-            <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
-                <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 bg-purple-50 text-purple-700 rounded-lg flex items-center justify-center shrink-0">
-                        <Key size={24} />
-                    </div>
-                    <div className="flex-1">
-                        <h3 className="text-lg font-bold text-gray-900">Gemini AI Engine</h3>
-                        <p className="text-gray-700 text-sm mb-4 font-medium">
-                            {isConfigured 
-                                ? "AI features are active using the pre-configured API_KEY."
-                                : "The API_KEY is missing from the environment. AI features will not function."}
-                        </p>
-                        {isConfigured && (
-                            <div className="flex items-center gap-2 text-sm text-green-800 font-bold bg-green-50 px-3 py-2 rounded-md border border-green-200 w-fit">
-                                <CheckCircle2 size={16} />
-                                <span>Engine Active</span>
                             </div>
                         )}
                     </div>

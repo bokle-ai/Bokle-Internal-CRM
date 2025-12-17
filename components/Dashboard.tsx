@@ -1,6 +1,6 @@
+
 import React, { useEffect, useState } from 'react';
 import { PhoneCall, Code2, CheckCircle2, Users, AlertTriangle, ExternalLink, Key, Check, Cloud, Database } from 'lucide-react';
-import { checkConfiguration } from '../services/geminiService';
 import { DataService } from '../services/storageService';
 import BrandLogo from './BrandLogo';
 
@@ -9,11 +9,9 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
-    const [isConfigured, setIsConfigured] = useState(true);
     const [isCloudActive, setIsCloudActive] = useState(false);
 
     useEffect(() => {
-        setIsConfigured(checkConfiguration());
         setIsCloudActive(DataService.isCloudEnabled());
     }, []);
 
@@ -55,20 +53,6 @@ const Dashboard: React.FC<DashboardProps> = ({ setActiveTab }) => {
 
             {/* Config Alerts */}
             <div className="space-y-4">
-                {!isConfigured && (
-                    <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-xl shadow-sm">
-                        <div className="flex items-start">
-                            <AlertTriangle className="text-red-500 mt-0.5 mr-3 shrink-0" size={20} />
-                            <div className="w-full">
-                                <h3 className="font-bold text-red-800">Gemini AI Key Missing</h3>
-                                <p className="text-red-700 text-sm mt-1">
-                                    The application requires a pre-configured API_KEY in the environment to function. Please ensure it is correctly set.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-                )}
-                
                 {!isCloudActive && (
                     <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded-xl shadow-sm">
                         <div className="flex items-start justify-between">
