@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { LayoutDashboard, PhoneCall, Handshake, FileText, Code2, Menu, X, Users, Settings, Database, Mail } from 'lucide-react';
+import { LayoutDashboard, PhoneCall, Handshake, FileText, Code2, Menu, X, Users, Settings, Database, Mail, Brain } from 'lucide-react';
 import BrandLogo from './BrandLogo';
 
 interface LayoutProps {
@@ -14,6 +14,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
 
     const navItems = [
         { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard },
+        { id: 'brain', label: 'The Brain', icon: Brain },
         { id: 'crm', label: 'CRM & Pipeline', icon: Users },
         { id: 'sales', label: 'Call Assistant', icon: PhoneCall },
         { id: 'outreach', label: 'Sales Outreach', icon: Mail },

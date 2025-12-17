@@ -1,3 +1,4 @@
+
 import { GoogleGenAI } from "@google/genai";
 import { BOKLE_CONTEXT } from "../constants";
 
@@ -17,6 +18,57 @@ const getAiClient = () => {
 const handleAiError = (error: any, context: string): string => {
     console.error(`Gemini API Error (${context}):`, error);
     return `Unable to generate content. Error: ${error.message || "Unknown error occurred."}`;
+};
+
+/**
+ * THE BRAIN: Strategic query over the whole database.
+ * Uses Gemini 3 Pro for advanced reasoning.
+ */
+export const queryCompanyBrain = async (
+    query: string,
+    history: { role: 'user' | 'ai', text: string }[],
+    knowledgeBase: string
+): Promise<AsyncGenerator<string, void, unknown>> => {
+    const ai = getAiClient();
+    
+    const formattedHistory = history.map(h => ({
+        role: h.role === 'user' ? 'user' as const : 'model' as const,
+        parts: [{ text: h.text }]
+    }));
+
+    const systemInstruction = `
+        YOU ARE THE BOKLE AI "BRAIN" (A bird's-eye strategic internal advisor).
+        
+        ${BOKLE_CONTEXT}
+
+        YOUR KNOWLEDGE BASE (CURRENT COMPANY DATA):
+        ${knowledgeBase}
+
+        INSTRUCTIONS:
+        1. You have full access to Gautam's CRM, Tech Tasks, Marketing, and Outreach history.
+        2. Answer questions about current projects, suggest cross-department strategies, or analyze the health of the business.
+        3. Be proactive. If you see a bottleneck (e.g., many tech tasks but few sales calls), point it out.
+        4. Maintain a "Strategic Partner" tone.
+    `;
+
+    const chat = ai.chats.create({
+        model: 'gemini-3-pro-preview',
+        config: {
+            systemInstruction,
+            temperature: 0.8,
+        },
+        history: formattedHistory
+    });
+
+    const responseStream = await chat.sendMessageStream({ message: query });
+    
+    async function* streamResults() {
+        for await (const chunk of responseStream) {
+            yield chunk.text || "";
+        }
+    }
+
+    return streamResults();
 };
 
 // Basic Text Task: 'gemini-3-flash-preview'

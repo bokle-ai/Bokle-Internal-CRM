@@ -9,6 +9,7 @@ import HandoverHelper from './components/HandoverHelper';
 import Integrations from './components/Integrations';
 import StorageManager from './components/StorageManager';
 import CRM from './components/CRM';
+import Brain from './components/Brain';
 import { IntegrationState } from './types';
 
 function App() {
@@ -25,6 +26,8 @@ function App() {
     switch (activeTab) {
       case 'dashboard':
         return <Dashboard setActiveTab={setActiveTab} />;
+      case 'brain':
+        return <Brain />;
       case 'crm':
         return <CRM />;
       case 'sales':
