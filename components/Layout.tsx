@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { LayoutDashboard, PhoneCall, Handshake, FileText, Code2, Menu, X, Users, Settings, Database, Mail } from 'lucide-react';
+import BrandLogo from './BrandLogo';
 
 interface LayoutProps {
     children: React.ReactNode;
@@ -34,88 +35,66 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
 
             {/* Sidebar */}
             <aside className={`
-                fixed lg:static inset-y-0 left-0 z-30 w-64 bg-[#15621B] text-white transition-transform duration-200 ease-in-out
+                fixed lg:static inset-y-0 left-0 z-30 w-64 bg-[#15621B] text-white transition-transform duration-200 ease-in-out flex flex-col
                 ${isMobileMenuOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
             `}>
-                <div className="p-6 flex items-center justify-between">
+                <div className="p-6 flex items-center justify-between shrink-0">
                     <div className="flex items-center gap-3">
-                        {/* Custom Sugar Glider Mascot Logo - Updated to match Brand Image */}
-                        <div className="w-10 h-10 bg-[#FBEFD0] rounded-full flex items-center justify-center shadow-md overflow-hidden border-2 border-white shrink-0">
-                            <svg viewBox="0 0 120 120" className="w-full h-full">
-                                {/* Ears */}
-                                <path d="M15 25 Q5 5 40 10" fill="#373737" /> {/* Left Ear Outer */}
-                                <path d="M105 25 Q115 5 80 10" fill="#373737" /> {/* Right Ear Outer */}
-                                <path d="M22 28 Q15 15 35 18" fill="#E8A996" /> {/* Left Ear Inner */}
-                                <path d="M98 28 Q105 15 85 18" fill="#E8A996" /> {/* Right Ear Inner */}
-                                
-                                {/* Head Outline/Face */}
-                                <path d="M20 50 C20 90 40 105 60 105 C80 105 100 90 100 50 C100 25 80 20 60 20 C40 20 20 25 20 50" fill="#FDF6E3" stroke="#373737" strokeWidth="2" />
-                                
-                                {/* Forehead Dark Pattern */}
-                                <path d="M60 20 L40 45 Q60 65 80 45 Z" fill="#373737" />
-                                
-                                {/* Green Tech Lines - Distinctive Brand Feature */}
-                                <path d="M60 25 L60 40" stroke="#22C55E" strokeWidth="3" strokeLinecap="round" /> 
-                                <path d="M50 32 L55 37" stroke="#22C55E" strokeWidth="2" strokeLinecap="round" />
-                                <path d="M70 32 L65 37" stroke="#22C55E" strokeWidth="2" strokeLinecap="round" />
-
-                                {/* Side Stripes on Face (Dark) */}
-                                <path d="M22 60 L35 70 L25 80 Z" fill="#373737" opacity="0.9" />
-                                <path d="M98 60 L85 70 L95 80 Z" fill="#373737" opacity="0.9" />
-
-                                {/* Eyes */}
-                                <ellipse cx="40" cy="65" rx="12" ry="15" fill="#15803d" stroke="#373737" strokeWidth="2" />
-                                <ellipse cx="80" cy="65" rx="12" ry="15" fill="#15803d" stroke="#373737" strokeWidth="2" />
-                                <circle cx="44" cy="60" r="4" fill="white" />
-                                <circle cx="76" cy="60" r="4" fill="white" />
-
-                                {/* Nose & Mouth */}
-                                <path d="M52 88 Q60 95 68 88" stroke="#373737" strokeWidth="2" fill="none" strokeLinecap="round" />
-                                <ellipse cx="60" cy="84" rx="5" ry="3" fill="#E8A996" />
-                            </svg>
+                        <BrandLogo className="w-10 h-10" />
+                        <div className="flex flex-col">
+                            <span className="text-xl font-bold tracking-wide leading-tight">Bokle AI</span>
+                            <span className="text-[10px] text-bokle-peach font-bold uppercase tracking-widest">Founder OS</span>
                         </div>
-                        <span className="text-xl font-bold tracking-wide">Bokle AI</span>
                     </div>
-                    <button onClick={() => setIsMobileMenuOpen(false)} className="lg:hidden text-white">
+                    <button onClick={() => setIsMobileMenuOpen(false)} className="lg:hidden text-white/70 hover:text-white">
                         <X size={24} />
                     </button>
                 </div>
 
-                <nav className="mt-6 px-4 space-y-2">
-                    {navItems.map((item) => (
-                        <button
-                            key={item.id}
-                            onClick={() => {
-                                setActiveTab(item.id);
-                                setIsMobileMenuOpen(false);
-                            }}
-                            className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                                activeTab === item.id 
-                                    ? 'bg-[#FBEFD0] text-[#15621B] font-medium shadow-md' 
-                                    : 'text-white/80 hover:bg-white/10 hover:text-white'
-                            }`}
-                        >
-                            <item.icon size={20} />
-                            {item.label}
-                        </button>
-                    ))}
+                <nav className="flex-1 px-4 space-y-1 overflow-y-auto mt-2 custom-scrollbar">
+                    {navItems.map((item) => {
+                        const isActive = activeTab === item.id;
+                        return (
+                            <button
+                                key={item.id}
+                                onClick={() => {
+                                    setActiveTab(item.id);
+                                    setIsMobileMenuOpen(false);
+                                }}
+                                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-200 group relative ${
+                                    isActive 
+                                        ? 'bg-[#FBEFD0] text-[#15621B] font-bold shadow-lg shadow-black/10' 
+                                        : 'text-white/70 hover:bg-white/10 hover:text-white'
+                                }`}
+                            >
+                                {isActive && (
+                                    <div className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-1 rounded-r-full bg-bokle-neon"></div>
+                                )}
+                                <item.icon size={20} className={isActive ? 'text-[#15621B]' : 'text-white/60 group-hover:text-white'} />
+                                {item.label}
+                            </button>
+                        );
+                    })}
                 </nav>
 
-                <div className="absolute bottom-0 w-full p-6 bg-[#0e4412]">
-                    <p className="text-xs text-white/60">Bokle AI Internal Tool</p>
-                    <p className="text-xs text-white/40 mt-1">v1.1.0 • Founder Edition</p>
+                <div className="p-6 bg-[#0e4412] shrink-0">
+                    <div className="flex items-center gap-2 mb-2">
+                        <div className="w-2 h-2 rounded-full bg-bokle-neon animate-pulse"></div>
+                        <span className="text-[10px] uppercase font-bold text-white/60 tracking-wider">System Online</span>
+                    </div>
+                    <p className="text-xs text-white/40">Bokle AI v1.2.0</p>
                 </div>
             </aside>
 
             {/* Main Content */}
-            <main className="flex-1 flex flex-col h-screen overflow-hidden">
-                <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between lg:justify-end">
+            <main className="flex-1 flex flex-col h-screen overflow-hidden bg-[#F3F4F6]">
+                <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between lg:justify-end shrink-0">
                     <button onClick={() => setIsMobileMenuOpen(true)} className="lg:hidden text-gray-600">
                         <Menu size={24} />
                     </button>
-                    <div className="flex items-center gap-2 text-sm text-gray-500">
-                        <span className="w-2 h-2 rounded-full bg-green-500"></span>
-                        AI Systems Operational
+                    <div className="flex items-center gap-2 text-sm font-medium text-gray-500 bg-gray-50 px-3 py-1.5 rounded-full border border-gray-100">
+                         <BrandLogo className="w-5 h-5" />
+                        <span>AI Assistant Ready</span>
                     </div>
                 </header>
 

@@ -128,11 +128,22 @@ export const generateOutreachSequence = async (
         Company: ${company}
         Suspected Pain Point: ${painPoint}
 
-        SEQUENCE REQUIREMENTS:
-        1. **LinkedIn Connection Note** (CRITICAL: MUST BE UNDER 300 CHARACTERS INCLUDING SPACES. Do not write a subject line. Just the message body. Keep it to 2 short sentences).
-        2. **Cold Email 1** (Short, punchy, focus on ${painPoint}, propose a solution not a meeting).
-        3. **LinkedIn Follow-up Message** (If connected but no reply).
-        4. **Cold Email 2 (The "Bump")** (Value-add, sharing a quick idea or resource).
+        SEQUENCE REQUIREMENTS (Strict Format):
+        You must use the exact headers below (starting with ## Step X:) so the system can parse them.
+
+        ## Step 1: LinkedIn Connection Note
+        (Max 300 chars. No subject. 2 short sentences. Friendly, peer-to-peer).
+
+        ## Step 2: Cold Email 1
+        Subject: [Write a catchy subject here]
+        (Short, punchy body. Focus on ${painPoint}. Propose a solution, not a meeting).
+
+        ## Step 3: LinkedIn Follow-up
+        (If connected but no reply. Very short).
+
+        ## Step 4: Cold Email 2 (The Bump)
+        Subject: Re: [Previous Subject]
+        (Value-add, sharing a quick idea or resource).
 
         TONE:
         - Founder-to-Founder (Peer level).
@@ -171,7 +182,7 @@ export const refineOutreachSequence = async (
         "${instruction}"
 
         REQUIREMENTS:
-        1. Keep the 4-step structure (LinkedIn Note, Email 1, etc) unless asked to change it.
+        1. Maintain the "## Step X: [Type]" header structure so the UI stays consistent.
         2. Only modify what is requested.
         3. Maintain Bokle AI's founder-friendly tone.
         4. Return the FULL updated content.

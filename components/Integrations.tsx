@@ -1,6 +1,6 @@
 
 import React, { useEffect, useState } from 'react';
-import { Mail, Linkedin, CheckCircle2, AlertCircle, Key, Trash2, Database, Download, RefreshCw, Cloud, Instagram, Workflow } from 'lucide-react';
+import { Mail, Linkedin, CheckCircle2, AlertCircle, Key, Trash2, Database, Download, RefreshCw, Cloud, Instagram, Workflow, Image, Upload } from 'lucide-react';
 import { IntegrationState } from '../types';
 import { getStoredApiKey, removeApiKey, saveApiKey, checkConfiguration } from '../services/geminiService';
 import { DataService, getSupabaseConfig, saveSupabaseConfig, clearSupabaseConfig } from '../services/storageService';
@@ -23,6 +23,9 @@ const Integrations: React.FC<IntegrationsProps> = ({ integrations, setIntegratio
     const [isSbConfigured, setIsSbConfigured] = useState(false);
     const [showSql, setShowSql] = useState(false);
 
+    // Brand Logo State
+    const [customLogo, setCustomLogo] = useState<string | null>(null);
+
     useEffect(() => {
         setStoredKey(getStoredApiKey());
         const isConfigured = checkConfiguration();
@@ -39,6 +42,11 @@ const Integrations: React.FC<IntegrationsProps> = ({ integrations, setIntegratio
             // Don't show key for security visual
             setSbKey('••••••••••••••••••••••••••••••••');
         }
+
+        // Check Logo
+        const logo = localStorage.getItem('bokle_brand_logo');
+        if (logo) setCustomLogo(logo);
+
     }, []);
 
     const toggleIntegration = (platform: 'gmail' | 'linkedin' | 'instagram') => {
@@ -94,6 +102,27 @@ const Integrations: React.FC<IntegrationsProps> = ({ integrations, setIntegratio
             DataService.clearLocalData();
             window.location.reload(); 
         }
+    };
+
+    const handleLogoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            const base64 = reader.result as string;
+            localStorage.setItem('bokle_brand_logo', base64);
+            setCustomLogo(base64);
+            // Reload to update sidebar instantly
+            window.location.reload();
+        };
+        reader.readAsDataURL(file);
+    };
+
+    const handleRemoveLogo = () => {
+        localStorage.removeItem('bokle_brand_logo');
+        setCustomLogo(null);
+        window.location.reload();
     };
 
     const setupSQL = `
@@ -199,6 +228,46 @@ $$;
             <div>
                 <h2 className="text-2xl font-bold text-[#373737]">Integrations & Settings</h2>
                 <p className="text-gray-600 font-medium">Connect your accounts and manage your database.</p>
+            </div>
+
+             {/* Brand Settings */}
+             <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
+                <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 bg-indigo-50 text-indigo-700 rounded-lg flex items-center justify-center shrink-0">
+                        <Image size={24} />
+                    </div>
+                    <div className="flex-1">
+                        <h3 className="text-lg font-bold text-gray-900">Brand Settings</h3>
+                        <p className="text-gray-700 text-sm mb-4 font-medium">
+                            Upload your custom logo to display in the sidebar and dashboard.
+                        </p>
+
+                        <div className="flex items-center gap-4">
+                            <div className="w-16 h-16 rounded-full border border-gray-200 bg-gray-50 flex items-center justify-center overflow-hidden">
+                                {customLogo ? (
+                                    <img src={customLogo} alt="Preview" className="w-full h-full object-contain" />
+                                ) : (
+                                    <span className="text-xs text-gray-400 font-medium">No Logo</span>
+                                )}
+                            </div>
+                            <div className="flex flex-col gap-2">
+                                <label className="cursor-pointer bg-white border border-gray-300 text-gray-700 px-4 py-2 rounded-lg text-sm font-bold hover:bg-gray-50 flex items-center gap-2">
+                                    <Upload size={16} />
+                                    Upload Logo
+                                    <input type="file" accept="image/*" className="hidden" onChange={handleLogoUpload} />
+                                </label>
+                                {customLogo && (
+                                    <button 
+                                        onClick={handleRemoveLogo}
+                                        className="text-xs text-red-500 hover:text-red-700 font-medium text-left"
+                                    >
+                                        Remove Logo
+                                    </button>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             {/* Workflow Integrations */}
