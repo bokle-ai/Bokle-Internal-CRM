@@ -1,12 +1,12 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Plus, DollarSign, Calendar, Zap, Trash2, Megaphone, Instagram, Linkedin, Video, Image, FileText, Code, Briefcase, Loader2, Cloud, CloudOff, Save, CheckCircle2, RotateCcw } from 'lucide-react';
-import { Deal, DealStatus, Project, ProjectStatus, MarketingTask, MarketingStatus } from '../types';
+import { Plus, DollarSign, Calendar, Zap, Trash2, Megaphone, Instagram, Linkedin, Video, Image, FileText, Code, Briefcase, Loader2, Cloud, CloudOff, Save, CheckCircle2, RotateCcw, Users, Mail, Phone, Globe, Building2 } from 'lucide-react';
+import { Deal, DealStatus, Project, ProjectStatus, MarketingTask, MarketingStatus, OutreachLead } from '../types';
 import LifecycleAutopilot from './LifecycleAutopilot';
 import { DataService } from '../services/storageService';
 
 const CRM: React.FC = () => {
-    const [view, setView] = useState<'sales' | 'tech' | 'marketing'>('sales');
+    const [view, setView] = useState<'leads' | 'sales' | 'tech' | 'marketing'>('leads');
     const [isLoading, setIsLoading] = useState(true);
     const [isCloud, setIsCloud] = useState(false);
     
@@ -14,6 +14,7 @@ const CRM: React.FC = () => {
     const [deals, setDeals] = useState<Deal[]>([]);
     const [projects, setProjects] = useState<Project[]>([]);
     const [marketingTasks, setMarketingTasks] = useState<MarketingTask[]>([]);
+    const [outreachLeads, setOutreachLeads] = useState<OutreachLead[]>([]);
     
     // Autosave & Dirty Tracking Refs
     const dealsRef = useRef<Deal[]>([]);
@@ -37,15 +38,22 @@ const CRM: React.FC = () => {
             setIsLoading(true);
             setIsCloud(DataService.isCloudEnabled());
             
-            const [d, p, m] = await Promise.all([
+            const [d, p, m, ol, fl] = await Promise.all([
                 DataService.getDeals(),
                 DataService.getProjects(),
-                DataService.getMarketing()
+                DataService.getMarketing(),
+                DataService.getOutreachLeads(),
+                DataService.getFormLeads(),
             ]);
 
             setDeals(d);
             setProjects(p);
             setMarketingTasks(m);
+
+            // Merge outreach leads: form leads first, then manual/csv, deduplicated
+            const existingIds = new Set(ol.map((l: OutreachLead) => l.id));
+            const newFormLeads = fl.filter((fl: OutreachLead) => !existingIds.has(fl.id));
+            setOutreachLeads([...newFormLeads, ...ol]);
             setIsLoading(false);
         };
         fetchData();
@@ -266,6 +274,9 @@ const CRM: React.FC = () => {
                 </div>
                 
                 <div className="flex bg-gray-200 p-1 rounded-lg self-start overflow-x-auto">
+                    <button onClick={() => setView('leads')} className={`px-4 py-2 rounded-md text-sm font-bold flex items-center gap-2 transition-all whitespace-nowrap ${view === 'leads' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>
+                        <Users size={16} /> Leads
+                    </button>
                     <button onClick={() => setView('sales')} className={`px-4 py-2 rounded-md text-sm font-bold flex items-center gap-2 transition-all whitespace-nowrap ${view === 'sales' ? 'bg-white text-[#15621B] shadow-sm' : 'text-gray-600 hover:text-gray-900'}`}>
                         <Briefcase size={16} /> Sales
                     </button>
@@ -278,11 +289,11 @@ const CRM: React.FC = () => {
                 </div>
             </div>
 
-            {!isAdding ? (
-                <button 
+            {view !== 'leads' && !isAdding ? (
+                <button
                     onClick={() => setIsAdding(true)}
                     className={`flex items-center gap-2 font-bold hover:bg-opacity-10 p-2.5 rounded-lg w-fit transition-colors border border-transparent hover:border-current ${
-                        view === 'marketing' ? 'text-pink-700 hover:bg-pink-100' : 
+                        view === 'marketing' ? 'text-pink-700 hover:bg-pink-100' :
                         view === 'tech' ? 'text-[#373737] hover:bg-gray-200' :
                         'text-[#15621B] hover:bg-green-50'
                     }`}
@@ -343,6 +354,70 @@ const CRM: React.FC = () => {
                 <div className="flex-1 flex flex-col items-center justify-center text-gray-500">
                     <Loader2 size={32} className="animate-spin mb-2 text-[#15621B]" />
                     <p className="font-medium">Loading your data...</p>
+                </div>
+            ) : view === 'leads' ? (
+                /* Leads from Sales Outreach */
+                <div className="flex-1 overflow-y-auto">
+                    {outreachLeads.length === 0 ? (
+                        <div className="flex flex-col items-center justify-center h-48 text-gray-400">
+                            <Users size={36} className="mb-3 text-blue-200" />
+                            <p className="font-medium text-gray-500">No leads yet.</p>
+                            <p className="text-sm text-gray-400 mt-1">Capture leads in Sales Outreach and they'll appear here.</p>
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+                            {outreachLeads.map(lead => {
+                                const statusColor =
+                                    lead.status === 'Contacted' ? 'bg-green-100 text-green-800 border-green-200' :
+                                    lead.status === 'Generated' ? 'bg-blue-100 text-blue-800 border-blue-200' :
+                                    'bg-gray-100 text-gray-700 border-gray-200';
+                                return (
+                                    <div key={lead.id} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow">
+                                        <div className="flex items-start justify-between mb-2">
+                                            <div>
+                                                <h4 className="font-bold text-gray-900 text-sm">{lead.name}</h4>
+                                                {lead.role && <p className="text-xs text-gray-500 font-medium">{lead.role}</p>}
+                                            </div>
+                                            <span className={`text-xs font-bold px-2 py-0.5 rounded-full border ${statusColor}`}>{lead.status}</span>
+                                        </div>
+                                        <div className="space-y-1.5 mt-3">
+                                            {lead.company && (
+                                                <div className="flex items-center gap-2 text-xs text-gray-600 font-medium">
+                                                    <Building2 size={12} className="text-gray-400 shrink-0" />
+                                                    <span className="truncate">{lead.company}</span>
+                                                </div>
+                                            )}
+                                            {lead.email && (
+                                                <div className="flex items-center gap-2 text-xs text-gray-600 font-medium">
+                                                    <Mail size={12} className="text-gray-400 shrink-0" />
+                                                    <span className="truncate">{lead.email}</span>
+                                                </div>
+                                            )}
+                                            {lead.phone && (
+                                                <div className="flex items-center gap-2 text-xs text-gray-600 font-medium">
+                                                    <Phone size={12} className="text-gray-400 shrink-0" />
+                                                    <span>{lead.phone}</span>
+                                                </div>
+                                            )}
+                                            {lead.website && (
+                                                <div className="flex items-center gap-2 text-xs text-gray-600 font-medium">
+                                                    <Globe size={12} className="text-gray-400 shrink-0" />
+                                                    <span className="truncate">{lead.website}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                        {lead.painPoint && (
+                                            <p className="mt-3 text-xs text-gray-500 italic line-clamp-2 border-t border-gray-100 pt-2">{lead.painPoint}</p>
+                                        )}
+                                        <div className="mt-3 flex items-center justify-between text-xs text-gray-400">
+                                            <span>{new Date(lead.createdAt).toLocaleDateString()}</span>
+                                            {lead.source && <span className="capitalize bg-gray-100 px-1.5 py-0.5 rounded font-medium text-gray-500">{lead.source}</span>}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
             ) : (
                 /* Kanban Board */

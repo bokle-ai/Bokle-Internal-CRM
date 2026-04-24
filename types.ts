@@ -72,16 +72,25 @@ export interface OutreachLead {
     company: string;
     role: string;
     email?: string;
+    phone?: string;
     website?: string;
     status: 'New' | 'Generated' | 'Contacted';
     painPoint?: string; // Inferred or Manual
     generatedSequence?: string;
     createdAt: string;
     lastContact?: string;
+    source?: 'form' | 'manual' | 'csv'; // Track origin
 }
 
 export interface IntegrationState {
     gmail: boolean;
     linkedin: boolean;
     instagram: boolean;
+}
+
+export interface CalendlyConfig {
+    token: string;
+    userUri: string;
+    userName: string;
+    schedulingUrl: string;
 }

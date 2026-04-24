@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { LayoutDashboard, PhoneCall, Handshake, FileText, Code2, Menu, X, Users, Settings, Database, Mail, Brain } from 'lucide-react';
+import { LayoutDashboard, PhoneCall, Handshake, FileText, Code2, Menu, X, Users, Settings, Database, Mail, Brain, CalendarDays } from 'lucide-react';
 import BrandLogo from './BrandLogo';
 
 interface LayoutProps {
@@ -20,6 +20,7 @@ const Layout: React.FC<LayoutProps> = ({ children, activeTab, setActiveTab }) =>
         { id: 'outreach', label: 'Sales Outreach', icon: Mail },
         { id: 'explainer', label: 'Service Explainer', icon: Handshake },
         { id: 'handover', label: 'Tech Handover', icon: Code2 },
+        { id: 'meetings', label: 'Meetings', icon: CalendarDays },
         { id: 'storage', label: 'Data Storage', icon: Database },
         { id: 'integrations', label: 'Integrations', icon: Settings },
     ];

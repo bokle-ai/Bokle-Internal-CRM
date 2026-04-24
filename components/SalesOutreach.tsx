@@ -66,8 +66,15 @@ const SalesOutreach: React.FC<SalesOutreachProps> = ({ integrations }) => {
 
     const loadLeads = async () => {
         setIsLoadingLeads(true);
-        const data = await DataService.getOutreachLeads();
-        setLeads(data);
+        const [outreachLeads, formLeads] = await Promise.all([
+            DataService.getOutreachLeads(),
+            DataService.getFormLeads(),
+        ]);
+        // Merge: form leads first (newest inquiries), then manual/csv leads.
+        // Deduplicate by id in case a form lead was already imported manually.
+        const existingIds = new Set(outreachLeads.map(l => l.id));
+        const newFormLeads = formLeads.filter(fl => !existingIds.has(fl.id));
+        setLeads([...newFormLeads, ...outreachLeads]);
         setIsLoadingLeads(false);
     };
 
@@ -259,8 +266,14 @@ const SalesOutreach: React.FC<SalesOutreachProps> = ({ integrations }) => {
     };
 
     const handleDeleteLead = async (id: string) => {
-        if(window.confirm("Delete lead?")) {
-            await DataService.deleteOutreachLead(id);
+        const lead = leads.find(l => l.id === id);
+        const msg = lead?.source === 'form'
+            ? "Remove this form lead from view? It will reappear on next reload since it comes from your website form."
+            : "Delete lead?";
+        if (window.confirm(msg)) {
+            if (lead?.source !== 'form') {
+                await DataService.deleteOutreachLead(id);
+            }
             if (selectedLeadId === id) setSelectedLeadId(null);
             setLeads(prev => prev.filter(l => l.id !== id));
         }
@@ -395,8 +408,13 @@ const SalesOutreach: React.FC<SalesOutreachProps> = ({ integrations }) => {
                                         className={`w-full text-left p-4 border-b border-gray-50 hover:bg-gray-50 transition-colors flex justify-between items-center group ${selectedLeadId === lead.id ? 'bg-green-50/50 border-l-4 border-l-[#15621B]' : 'border-l-4 border-l-transparent'}`}
                                     >
                                         <div className="min-w-0 flex-1">
-                                            <div className="font-bold text-gray-900 text-xs truncate">{lead.name}</div>
-                                            <div className="text-[10px] text-gray-500 font-medium truncate uppercase tracking-tight">{lead.company}</div>
+                                            <div className="font-bold text-gray-900 text-xs truncate flex items-center gap-1.5">
+                                                {lead.name}
+                                                {lead.source === 'form' && <span className="text-[8px] font-bold bg-blue-100 text-blue-500 px-1 rounded shrink-0">FORM</span>}
+                                            </div>
+                                            <div className="text-[10px] text-gray-500 font-medium truncate uppercase tracking-tight">
+                                                {lead.company || lead.email || '—'}
+                                            </div>
                                             {lead.lastContact && (
                                                 <div className="flex items-center gap-1 text-[9px] text-[#15621B] mt-1 font-bold">
                                                     <Calendar size={8} /> {lead.lastContact}
@@ -406,7 +424,7 @@ const SalesOutreach: React.FC<SalesOutreachProps> = ({ integrations }) => {
                                         <div className="flex items-center gap-2 ml-2">
                                              {lead.status === 'New' && <span className="w-1.5 h-1.5 rounded-full bg-red-400" title="New" />}
                                              {lead.status === 'Generated' && <span className="w-1.5 h-1.5 rounded-full bg-blue-400" title="Generated" />}
-                                             {lead.status === 'Contacted' && <Check size={12} className="text-green-600" title="Contacted" />}
+                                             {lead.status === 'Contacted' && <span title="Contacted"><Check size={12} className="text-green-600" /></span>}
                                         </div>
                                     </button>
                                 ))
@@ -424,9 +442,17 @@ const SalesOutreach: React.FC<SalesOutreachProps> = ({ integrations }) => {
                                             {selectedLead.name.charAt(0)}
                                         </div>
                                         <div>
-                                            <h3 className="text-lg font-bold text-gray-900">{selectedLead.name}</h3>
-                                            <div className="text-gray-500 text-xs font-bold uppercase tracking-wide flex items-center gap-1.5">
-                                                {selectedLead.role} <span className="w-1 h-1 rounded-full bg-gray-300" /> {selectedLead.company}
+                                            <div className="flex items-center gap-2">
+                                                <h3 className="text-lg font-bold text-gray-900">{selectedLead.name}</h3>
+                                                {selectedLead.source === 'form' && (
+                                                    <span className="text-[10px] font-bold bg-blue-50 text-blue-600 border border-blue-200 px-2 py-0.5 rounded-full">Form Lead</span>
+                                                )}
+                                            </div>
+                                            <div className="text-gray-500 text-xs font-bold uppercase tracking-wide flex items-center gap-1.5 flex-wrap">
+                                                {selectedLead.role && <>{selectedLead.role} <span className="w-1 h-1 rounded-full bg-gray-300" /></>}
+                                                {selectedLead.company && <>{selectedLead.company}</>}
+                                                {selectedLead.email && <span className="text-[#15621B] normal-case">{selectedLead.email}</span>}
+                                                {selectedLead.phone && <span className="text-gray-600 normal-case">📞 {selectedLead.phone}</span>}
                                             </div>
                                         </div>
                                     </div>

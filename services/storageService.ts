@@ -207,6 +207,33 @@ export const DataService = {
         }
     },
 
+    // --- FORM LEADS (from external Supabase 'Leads' table) ---
+    getFormLeads: async (): Promise<OutreachLead[]> => {
+        const sb = getSupabase();
+        if (!sb) return [];
+        const { data, error } = await sb
+            .from('Leads')
+            .select('*')
+            .order('id', { ascending: false });
+        if (error || !data) {
+            console.error("Supabase Error (Form Leads):", error);
+            return [];
+        }
+        return data.map((row: any) => ({
+            id: row.id,                              // raw UUID — enables natural deduplication once promoted
+            name: row.Name || row.name || 'Unknown',
+            email: row.Email || row.email || '',
+            phone: String(row.Phone ?? row.phone ?? ''),
+            company: '',
+            role: '',
+            website: '',
+            status: 'New' as const,
+            painPoint: row.Message || row.message || '',
+            createdAt: row.created_at || new Date().toISOString(),
+            source: 'form' as const,
+        }));
+    },
+
     // --- OUTREACH LEADS (NEW) ---
     getOutreachLeads: async (): Promise<OutreachLead[]> => {
         const sb = getSupabase();
