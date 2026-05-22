@@ -94,3 +94,47 @@ export interface CalendlyConfig {
     userName: string;
     schedulingUrl: string;
 }
+
+// ── Module D: Client Delivery Timeline ──────────────────────────────────────
+
+export type MilestoneStatus = 'upcoming' | 'completed' | 'overdue';
+export type TimelineTemplate = '6-week' | '12-week' | 'custom';
+
+export interface ChecklistItem {
+    item: string;
+    done: boolean;
+}
+
+export interface Milestone {
+    id: string;
+    timelineId: string;
+    title: string;
+    weekNumber: number;
+    dueDate: string;
+    status: MilestoneStatus;
+    owner?: string;
+    notes?: string;
+    checklist?: ChecklistItem[];
+}
+
+export interface DeliveryTimeline {
+    id: string;
+    dealId?: string;
+    clientName: string;
+    templateType: TimelineTemplate;
+    totalWeeks: number;
+    startDate: string;
+    status: 'active' | 'completed' | 'paused';
+    standupLink?: string;
+    createdAt: string;
+}
+
+// ── Module E: Proposal Templates ────────────────────────────────────────────
+
+export interface ProposalTemplate {
+    id: string;
+    name: string;
+    category: string;
+    htmlContent: string;
+    createdAt: string;
+}

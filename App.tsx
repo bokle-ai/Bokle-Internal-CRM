@@ -11,6 +11,8 @@ import StorageManager from './components/StorageManager';
 import CRM from './components/CRM';
 import Brain from './components/Brain';
 import Meetings from './components/Meetings';
+import DeliveryTimelineModule from './components/DeliveryTimeline';
+import ProposalBuilder from './components/ProposalBuilder';
 import { IntegrationState } from './types';
 
 function App() {
@@ -41,6 +43,10 @@ function App() {
         return <HandoverHelper />;
       case 'storage':
         return <StorageManager />;
+      case 'delivery':
+        return <DeliveryTimelineModule />;
+      case 'documents':
+        return <ProposalBuilder />;
       case 'meetings':
         return <Meetings />;
       case 'integrations':

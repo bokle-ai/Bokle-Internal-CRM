@@ -1,6 +1,6 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
-import { Deal, Project, MarketingTask, DealArtifact, OutreachLead } from '../types';
+import { Deal, Project, MarketingTask, DealArtifact, OutreachLead, DeliveryTimeline, Milestone, ProposalTemplate } from '../types';
 
 // --- CONFIGURATION ---
 const KEYS = {
@@ -138,6 +138,21 @@ export const DataService = {
             localStorage.setItem(KEYS.ARTIFACTS, JSON.stringify(all));
         }
     },
+
+    deleteArtifact: async (id: string) => {
+        const sb = getSupabase();
+        if (sb) {
+            await sb.from('deal_artifacts').delete().eq('id', id);
+        } else {
+            const all = parseLocal<DealArtifact[]>(KEYS.ARTIFACTS, []);
+            localStorage.setItem(KEYS.ARTIFACTS, JSON.stringify(all.filter(a => a.id !== id)));
+        }
+    },
+
+    // Aliases used by ProposalBuilder
+    getDealArtifacts: async (dealId?: string): Promise<DealArtifact[]> => DataService.getArtifacts(dealId),
+    saveDealArtifact: async (artifact: DealArtifact) => DataService.saveArtifact(artifact),
+    deleteDealArtifact: async (id: string) => DataService.deleteArtifact(id),
 
     // --- PROJECTS ---
     getProjects: async (): Promise<Project[]> => {
@@ -315,6 +330,105 @@ export const DataService = {
                 return true;
             }
             return false;
+        }
+    },
+
+    // --- DELIVERY TIMELINES ---
+    getTimelines: async (): Promise<DeliveryTimeline[]> => {
+        const sb = getSupabase();
+        if (sb) {
+            const { data, error } = await sb.from('delivery_timelines').select('*').order('createdAt', { ascending: false });
+            if (!error && data) return data as DeliveryTimeline[];
+        }
+        return parseLocal<DeliveryTimeline[]>('bokle_timelines', []);
+    },
+
+    saveTimeline: async (timeline: DeliveryTimeline) => {
+        const sb = getSupabase();
+        if (sb) {
+            await sb.from('delivery_timelines').upsert(timeline);
+        } else {
+            const all = parseLocal<DeliveryTimeline[]>('bokle_timelines', []);
+            const idx = all.findIndex(t => t.id === timeline.id);
+            if (idx >= 0) all[idx] = timeline; else all.push(timeline);
+            localStorage.setItem('bokle_timelines', JSON.stringify(all));
+        }
+    },
+
+    deleteTimeline: async (id: string) => {
+        const sb = getSupabase();
+        if (sb) {
+            await sb.from('delivery_timelines').delete().eq('id', id);
+        } else {
+            const all = parseLocal<DeliveryTimeline[]>('bokle_timelines', []);
+            localStorage.setItem('bokle_timelines', JSON.stringify(all.filter(t => t.id !== id)));
+        }
+    },
+
+    // --- MILESTONES ---
+    getMilestones: async (timelineId?: string): Promise<Milestone[]> => {
+        const sb = getSupabase();
+        if (sb) {
+            let q = sb.from('milestones').select('*').order('weekNumber', { ascending: true });
+            if (timelineId) q = q.eq('timelineId', timelineId);
+            const { data, error } = await q;
+            if (!error && data) return data as Milestone[];
+        }
+        const all = parseLocal<Milestone[]>('bokle_milestones', []);
+        return timelineId ? all.filter(m => m.timelineId === timelineId) : all;
+    },
+
+    saveMilestone: async (milestone: Milestone) => {
+        const sb = getSupabase();
+        if (sb) {
+            await sb.from('milestones').upsert(milestone);
+        } else {
+            const all = parseLocal<Milestone[]>('bokle_milestones', []);
+            const idx = all.findIndex(m => m.id === milestone.id);
+            if (idx >= 0) all[idx] = milestone; else all.push(milestone);
+            localStorage.setItem('bokle_milestones', JSON.stringify(all));
+        }
+    },
+
+    deleteMilestone: async (id: string) => {
+        const sb = getSupabase();
+        if (sb) {
+            await sb.from('milestones').delete().eq('id', id);
+        } else {
+            const all = parseLocal<Milestone[]>('bokle_milestones', []);
+            localStorage.setItem('bokle_milestones', JSON.stringify(all.filter(m => m.id !== id)));
+        }
+    },
+
+    // --- PROPOSAL TEMPLATES ---
+    getProposalTemplates: async (): Promise<ProposalTemplate[]> => {
+        const sb = getSupabase();
+        if (sb) {
+            const { data, error } = await sb.from('proposal_templates').select('*').order('createdAt', { ascending: false });
+            if (!error && data) return data as ProposalTemplate[];
+        }
+        return parseLocal<ProposalTemplate[]>('bokle_proposal_templates', []);
+    },
+
+    saveProposalTemplate: async (template: ProposalTemplate) => {
+        const sb = getSupabase();
+        if (sb) {
+            await sb.from('proposal_templates').upsert(template);
+        } else {
+            const all = parseLocal<ProposalTemplate[]>('bokle_proposal_templates', []);
+            const idx = all.findIndex(t => t.id === template.id);
+            if (idx >= 0) all[idx] = template; else all.push(template);
+            localStorage.setItem('bokle_proposal_templates', JSON.stringify(all));
+        }
+    },
+
+    deleteProposalTemplate: async (id: string) => {
+        const sb = getSupabase();
+        if (sb) {
+            await sb.from('proposal_templates').delete().eq('id', id);
+        } else {
+            const all = parseLocal<ProposalTemplate[]>('bokle_proposal_templates', []);
+            localStorage.setItem('bokle_proposal_templates', JSON.stringify(all.filter(t => t.id !== id)));
         }
     },
 
