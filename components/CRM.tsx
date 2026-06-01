@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Plus, DollarSign, Calendar, Zap, Trash2, Megaphone, Instagram, Linkedin, Video, Image, FileText, Code, Briefcase, Loader2, Cloud, CloudOff, Save, CheckCircle2, RotateCcw, Users, Mail, Phone, Globe, Building2 } from 'lucide-react';
 import { Deal, DealStatus, Project, ProjectStatus, MarketingTask, MarketingStatus, OutreachLead } from '../types';
 import LifecycleAutopilot from './LifecycleAutopilot';
+import DealDetailPanel from './DealDetailPanel';
 import { DataService } from '../services/storageService';
 
 const CRM: React.FC = () => {
@@ -121,6 +122,7 @@ const CRM: React.FC = () => {
 
 
     const [autopilotDeal, setAutopilotDeal] = useState<Deal | null>(null);
+    const [detailDeal, setDetailDeal] = useState<Deal | null>(null);
     const [isAdding, setIsAdding] = useState(false);
     
     const salesColumns: DealStatus[] = ['Lead', 'Discovery', 'Proposal', 'Negotiation', 'Closed Won'];
@@ -182,6 +184,15 @@ const CRM: React.FC = () => {
     const updateDealStatus = (id: string, newStatus: DealStatus) => {
         setDeals(prev => prev.map(d => d.id === id ? { ...d, status: newStatus } : d));
         dirtyDeals.current.add(id);
+        setSaveStatus('unsaved');
+    };
+
+    // Called by DealDetailPanel on any edit — syncs panel changes back to kanban
+    const handlePanelUpdate = (updated: Deal) => {
+        setDeals(prev => prev.map(d => d.id === updated.id ? updated : d));
+        // Keep detailDeal in sync so panel reflects latest state
+        setDetailDeal(updated);
+        dirtyDeals.current.add(updated.id);
         setSaveStatus('unsaved');
     };
 
@@ -455,17 +466,26 @@ const CRM: React.FC = () => {
                                     <div className="p-2 space-y-3 flex-1 overflow-y-auto max-h-[600px]">
                                         {/* Render Cards Logic */}
                                         {view === 'sales' && deals.filter(d => d.status === col).map(deal => (
-                                            <div key={deal.id} className="bg-white p-3 rounded-lg shadow-sm border border-gray-200 group hover:shadow-md transition-shadow relative hover:border-gray-300">
+                                            <div
+                                                key={deal.id}
+                                                className="bg-white p-3 rounded-lg shadow-sm border border-gray-200 group hover:shadow-md transition-shadow relative hover:border-[#15621B]/40 cursor-pointer"
+                                                onClick={() => setDetailDeal(deal)}
+                                            >
                                                 <div className="flex justify-between items-start mb-1">
                                                     <h4 className="font-bold text-gray-900 text-sm">{deal.clientName}</h4>
-                                                    <button onClick={() => deleteItem(deal.id)} className="text-gray-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"><Trash2 size={14} /></button>
+                                                    <button
+                                                        onClick={e => { e.stopPropagation(); deleteItem(deal.id); }}
+                                                        className="text-gray-300 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                    >
+                                                        <Trash2 size={14} />
+                                                    </button>
                                                 </div>
                                                 <p className="text-xs text-gray-600 font-medium mb-3">{deal.service}</p>
                                                 <div className="flex items-center justify-between text-xs font-medium text-gray-700 mb-3">
                                                     <span className="flex items-center gap-1 bg-green-50 text-green-800 border border-green-100 px-1.5 py-0.5 rounded font-bold"><DollarSign size={10} /> {deal.value}</span>
                                                     <span className="text-gray-500 font-medium">{deal.lastContact}</span>
                                                 </div>
-                                                <div className="space-y-2">
+                                                <div className="space-y-2" onClick={e => e.stopPropagation()}>
                                                     <select className="w-full text-xs p-1.5 border border-gray-300 rounded bg-gray-50 text-gray-800 outline-none focus:border-[#15621B] font-medium" value={deal.status} onChange={(e) => updateDealStatus(deal.id, e.target.value as DealStatus)}>
                                                         {salesColumns.map(s => <option key={s} value={s}>{s}</option>)}
                                                     </select>
@@ -511,6 +531,13 @@ const CRM: React.FC = () => {
                     </div>
                 </div>
             )}
+
+            {/* ── Deal Detail Panel ── */}
+            <DealDetailPanel
+                deal={detailDeal}
+                onClose={() => setDetailDeal(null)}
+                onUpdateDeal={handlePanelUpdate}
+            />
         </div>
     );
 };

@@ -27,6 +27,34 @@ export type DealStatus = 'Lead' | 'Discovery' | 'Proposal' | 'Negotiation' | 'Cl
 export type ProjectStatus = 'Backlog' | 'In Progress' | 'Review' | 'Deployed';
 export type MarketingStatus = 'Idea' | 'Scripting' | 'Design' | 'Review' | 'Scheduled' | 'Published';
 
+// ── Lead Source ──────────────────────────────────────────────────────────────
+
+export type LeadSource = 'Meta Ads' | 'Apollo Outbound' | 'Website Form' | 'WhatsApp' | 'Referral' | 'Manual';
+
+// ── Follow-Up Reminders ──────────────────────────────────────────────────────
+
+export interface FollowUpReminder {
+    id: string;
+    dealId: string;
+    dueDate: string;       // ISO date string e.g. "2026-06-05"
+    note: string;          // e.g. "Call back, said busy this week"
+    isDone: boolean;
+    createdAt: string;
+}
+
+// ── Deal Activity Log ────────────────────────────────────────────────────────
+
+export interface DealActivity {
+    id: string;
+    dealId: string;
+    type: 'call' | 'email' | 'whatsapp' | 'note' | 'stage_change' | 'reminder_set';
+    description: string;
+    timestamp: string;     // ISO datetime string
+    createdBy?: string;    // e.g. 'Gautam' or 'Dad'
+}
+
+// ── Deal ─────────────────────────────────────────────────────────────────────
+
 export interface Deal {
     id: string;
     clientName: string;
@@ -38,6 +66,13 @@ export interface Deal {
     industry?: string;
     problemStatement?: string;
     notes?: string;
+    // Lead tracking
+    source?: LeadSource;
+    email?: string;
+    phone?: string;
+    // Activity & reminders
+    reminders?: FollowUpReminder[];
+    activities?: DealActivity[];
 }
 
 export interface Project {
